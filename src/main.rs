@@ -6,6 +6,7 @@ extern crate vulkano_win;
 extern crate winit;
 
 
+mod shaders;
 
 use vulkano::sync::GpuFuture;
 use vulkano::buffer::BufferUsage;
@@ -26,37 +27,8 @@ use winit::EventsLoop;
 use winit::WindowBuilder;
 use std::sync::Arc;
 
-
-mod vs {
-    #[derive(VulkanoShader)]
-    #[ty = "vertex"]
-    #[src = "
-#version 450
-
-layout(location = 0) in vec2 position;
-
-void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
-}
-"]
-    struct Dummy;
-}
-
-mod fs {
-    #[derive(VulkanoShader)]
-    #[ty = "fragment"]
-    #[src = "
-#version 450
-
-layout(location = 0) out vec4 f_color;
-
-void main() {
-    f_color = vec4(1.0, 0.0, 0.0, 1.0);
-}
-"]
-    struct Dummy;
-}
-
+use shaders::vs;
+use shaders::fs;
 
 #[derive(Copy, Clone)]
 struct Vertex {
