@@ -24,6 +24,7 @@ extern crate vulkano_win;
 extern crate winit;
 
 use vulkano as vk;
+
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
@@ -35,8 +36,11 @@ use vulkano::descriptor::pipeline_layout::PipelineLayoutDescPcRange;
 use vulkano::device::Device;
 use vulkano::device::DeviceExtensions;
 use vulkano::format;
+use vulkano::format::Format;
 use vulkano::framebuffer::Framebuffer;
 use vulkano::framebuffer::Subpass;
+use vulkano::image::Dimensions;
+use vulkano::image::StorageImage;
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::shader::GraphicsShaderType;
 use vulkano::pipeline::shader::ShaderInterfaceDef;
@@ -44,9 +48,9 @@ use vulkano::pipeline::shader::ShaderInterfaceDefEntry;
 use vulkano::pipeline::shader::ShaderModule;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 use vulkano::pipeline::viewport::Viewport;
+use vulkano::sampler::Filter;
 use vulkano::swapchain::Swapchain;
 use vulkano::sync::GpuFuture;
-
 use vulkano_win::VkSurfaceBuild;
 
 use std::borrow::Cow;
@@ -58,10 +62,9 @@ use std::sync::Arc;
 #[derive(Copy, Clone)]
 pub struct Vertex {
     pub position: [f32; 2],
-    pub color: [f32; 3],
 }
 
-impl_vertex!(Vertex, position, color);
+impl_vertex!(Vertex, position);
 
 fn main() {
     let instance = vk::instance::Instance::new(
@@ -96,6 +99,26 @@ fn main() {
     };
     let graphics_queue = queues.next().unwrap();
 
+
+    let caps = window.surface()
+        .capabilities(graphics_device.physical_device())
+        .expect("failure to get surface capabilities");
+
+    let dimensions = caps.current_extent.unwrap_or([1024, 768]);
+
+    let mandelbrotImage = StorageImage::new(
+        graphics_device.clone(),
+        Dimensions::Dim2d { width: dimensions[0], height: dimensions[1] },
+        Format::R8G8B8A8Unorm,
+        Some(graphics_queue.family())
+    ).unwrap();
+
+
+
+
+
+    // TODO recreate swapchain on image resize with 
+    // https://docs.rs/vulkano/0.7/vulkano/swapchain/index.html
     let (swapchain, images) = {
         let caps = window.surface()
             .capabilities(graphics_device.physical_device())
@@ -140,7 +163,7 @@ fn main() {
     );
 
     let vs = {
-        let mut f = File::open("shaders/runtime-shader.vert.spv")
+        let mut f = File::open("shaders/texture.vert.spv")
             .expect("Can't find file");
         let mut v = vec![];
         f.read_to_end(&mut v).unwrap();
@@ -150,7 +173,7 @@ fn main() {
     };
 
     let fs = {
-        let mut f = File::open("shaders/runtime-shader.frag.spv")
+        let mut f = File::open("shaders/texture.frag.spv")
             .expect("Can't find file");
         let mut v = vec![];
         f.read_to_end(&mut v).unwrap();
@@ -181,14 +204,6 @@ fn main() {
             //   should not overlap.
             // * Format of each element must be no larger than 128 bits.
             if self.0 == 0 {
-                self.0 += 1;
-                return Some(ShaderInterfaceDefEntry {
-                    location: 1..2,
-                    format: format::Format::R32G32B32Sfloat,
-                    name: Some(Cow::Borrowed("color"))
-                })
-            }
-            if self.0 == 1 {
                 self.0 += 1;
                 return Some(ShaderInterfaceDefEntry {
                     location: 0..1,
@@ -229,8 +244,8 @@ fn main() {
                 self.0 += 1;
                 return Some(ShaderInterfaceDefEntry {
                     location: 0..1,
-                    format: format::Format::R32G32B32Sfloat,
-                    name: Some(Cow::Borrowed("v_color"))
+                    format: format::Format::R32G32Sfloat,
+                    name: Some(Cow::Borrowed("out_position"))
                 })
             }
             None
@@ -289,8 +304,8 @@ fn main() {
                 self.0 += 1;
                 return Some(ShaderInterfaceDefEntry {
                     location: 0..1,
-                    format: format::Format::R32G32B32Sfloat,
-                    name: Some(Cow::Borrowed("v_color"))
+                    format: format::Format::R32G32Sfloat,
+                    name: Some(Cow::Borrowed("position"))
                 })
             }
             None
@@ -408,17 +423,21 @@ fn main() {
         graphics_device.clone(),
         BufferUsage::all(),
         [
-            Vertex { position: [-1.0,  1.0], color: [1.0, 0.0, 0.0] },
-            Vertex { position: [ 0.0, -1.0], color: [0.0, 1.0, 0.0] },
-            Vertex { position: [ 1.0,  1.0], color: [0.0, 0.0, 1.0] },
+            Vertex { position: [ 1.0,  1.0] },
+            Vertex { position: [-1.0,  1.0] },
+            Vertex { position: [-1.0, -1.0] },
+            Vertex { position: [ 1.0, -1.0] },
         ].iter().cloned()
     ).expect("failed to create vertex buffer");
+
+    let indices : [u16; 6] =  [0, 1, 2, 2, 3, 0];
+    let index_buffer = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap();
 
     // NOTE: We don't create any descriptor sets in this example, but you should
     // note that passing wrong types, providing sets at wrong indexes will cause
     // descriptor set builder to return Err!
 
-    let framebuffers: Vec<_> = images
+   let framebuffers: Vec<_> = images
         .iter()
         .map(|image| Arc::new(
             Framebuffer::start(renderpass.clone())
@@ -436,6 +455,18 @@ fn main() {
                 None,
             ).expect("failed to acquire swapchain in time");
 
+        let iter = (0 .. 3145728).map(|_| 255u8);
+        let source = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(),
+                                                    iter).unwrap();
+
+
+
+        // TODO
+        // 1. The CPU writes to the CPU Accessible Buffer 
+        // 2. We convert the Buffer to an Image?
+        // 3. We add the image as a source 
+        // 4. We sample it using a fragment shader
+        //
         let command_buffer = AutoCommandBufferBuilder
             ::new(
                 graphics_device.clone(),
@@ -446,10 +477,11 @@ fn main() {
                 false,
                 vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],
             ).unwrap()
-            .draw(
+            .draw_indexed(
                 graphics_pipeline.clone(),
                 DynamicState::none(),
                 vertex_buffer.clone(),
+                index_buffer.clone(),
                 (),
                 (),
             ).unwrap()

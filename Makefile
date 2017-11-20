@@ -3,7 +3,7 @@
 %.spv: %.glsl
 	glslangValidator $< -V -S $(subst .,,$(suffix $(basename $<))) -o $@
 
-target/testit: shaders/runtime-shader.vert.spv shaders/runtime-shader.frag.spv
+target/testit: shaders/texture.vert.spv shaders/texture.frag.spv shaders/mandelbrot.comp.spv
 	cargo build
 
 
