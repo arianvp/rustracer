@@ -1,6 +1,9 @@
 [package]
-name = "rustracer"
+name = "testit"
 version = "0.1.0"
-authors = ["Arian van Putten <a.vanputten@uu.nl>"]
+authors = ["Arian van Putten <aeroboy94@gmail.com>"]
 
 [dependencies]
+vulkano = "0.7"
+vulkano-win = "0.7"
+winit = "0.7"
