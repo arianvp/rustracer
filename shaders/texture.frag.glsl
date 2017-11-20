@@ -15,11 +15,7 @@ void main()
  // outFragColor = texture(samplerColor, inUV);
 
 
-
-
-
-
-    vec2 c = (position - vec2(0.5)) * 2.0 - vec2(1.0, 0.0);
+    vec2 c = (position) * 2.0 - vec2(1.0, 0.0);
 
     vec2 z = vec2(0.0, 0.0);
     float i;
