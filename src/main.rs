@@ -74,7 +74,7 @@ fn main() {
         .expect("no graphics device");
     let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
-        .with_decorations(true)
+        .with_decorations(false)
         .with_title("particle storm")
         .build_vk_surface(&events_loop, instance.clone())
         .unwrap();
@@ -140,8 +140,8 @@ fn main() {
     );
 
     let vs = {
-        let mut f = File::open("runtime-shader.vert.spv")
-            .expect("Can't find file src/bin/runtime-shader.vert.spv");
+        let mut f = File::open("shaders/runtime-shader.vert.spv")
+            .expect("Can't find file");
         let mut v = vec![];
         f.read_to_end(&mut v).unwrap();
         // Create a ShaderModule on a device the same Shader::load does it.
@@ -150,8 +150,8 @@ fn main() {
     };
 
     let fs = {
-        let mut f = File::open("runtime-shader.frag.spv")
-            .expect("Can't find file src/bin/runtime-shader.frag.spv");
+        let mut f = File::open("shaders/runtime-shader.frag.spv")
+            .expect("Can't find file");
         let mut v = vec![];
         f.read_to_end(&mut v).unwrap();
         unsafe { ShaderModule::new(graphics_device.clone(), &v) }.unwrap()
