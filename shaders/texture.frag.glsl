@@ -3,9 +3,9 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-// layout (binding = 1) uniform sampler2D samplerColor;
 
 layout (location = 0) in vec2 position;
+// layout (binding = 0, rgba8) uniform readonly image2D to_draw;
 
 layout (location = 0) out vec4 f_color;
 
@@ -13,6 +13,9 @@ void main()
 {
  // f_color = vec4(position.x,position.y,0.0, 1.0);
  // outFragColor = texture(samplerColor, inUV);
+
+    //vec3 rgb = imageLoad(to_draw, ivec2(position)).rgb;
+    //f_color = vec4(rgb.rgb, 1.0);*/
 
 
     vec2 c = (position) * 2.0 - vec2(1.0, 0.0);

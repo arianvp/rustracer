@@ -5,5 +5,6 @@ authors = ["Arian van Putten <aeroboy94@gmail.com>"]
 
 [dependencies]
 vulkano = "0.7"
+vulkano-shader-derive = "0.7"
 vulkano-win = "0.7"
 winit = "0.7"

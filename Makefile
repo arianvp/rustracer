@@ -8,5 +8,5 @@ target/testit: shaders/texture.vert.spv shaders/texture.frag.spv shaders/mandelb
 
 
 build: target/testit
-run:
+run: target/testit
 	cargo run
