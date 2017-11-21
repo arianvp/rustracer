@@ -9,6 +9,7 @@ extern crate winit;
 mod shaders;
 
 use vulkano::sync::GpuFuture;
+use vulkano::sync::now;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
@@ -22,10 +23,13 @@ use vulkano::instance::PhysicalDevice;
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::Swapchain;
+use vulkano::swapchain::SwapchainCreationError;
+use vulkano::swapchain::AcquireError;
 use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
 use std::sync::Arc;
+use std::mem;
 
 use shaders::mandelbrot::vs;
 use shaders::mandelbrot::fs;
@@ -99,16 +103,18 @@ fn main () {
 
     let vs = vs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
     let fs = fs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
+    let mut dimensions;
+
     // TODO recreate swapchain on image resize with 
     // https://docs.rs/vulkano/0.7/vulkano/swapchain/index.html
-    let (swapchain, images) = {
+    let (mut swapchain, mut images) = {
         use vulkano::swapchain::SurfaceTransform;
         use vulkano::swapchain::CompositeAlpha;
         let caps = window.surface()
             .capabilities(graphics_device.physical_device())
             .expect("failure to get surface capabilities");
         let format = caps.supported_formats[0].0;
-        let dimensions = caps.current_extent.unwrap_or([1024, 768]);
+        dimensions = caps.current_extent.unwrap_or([1024, 768]);
         let usage = caps.supported_usage_flags;
         let present = caps.present_modes.iter().next().unwrap();
 
@@ -156,22 +162,19 @@ fn main () {
     .unwrap());
 
 
-   let framebuffers: Vec<_> = images
-        .iter()
-        .map(|image| Arc::new(
-            Framebuffer::start(renderpass.clone())
-                .add(image.clone()).unwrap()
-                .build().unwrap(),
-        ))
-        .collect();
+    let mut framebuffers: Option<Vec<Arc<vulkano::framebuffer::Framebuffer<_,_>>>> = None;
+    let mut recreate_swapchain = false;
+    let mut previous_frame_end = Box::new(now(graphics_device.clone())) as Box<GpuFuture>;
 
     loop {
-        events_loop.poll_events(|event| {
-            match event {
-                // TODO: handle events so that we can control the camera
-                _ => {},
-            }
-        });
+
+        // It is important to call this function from time to time, otherwise resources will keep
+        // accumulating and you will eventually reach an out of memory error.  Calling this
+        // function polls various fences in order to determine what the GPU has already processed,
+        // and frees the resources that are no longer needed.
+
+        previous_frame_end.cleanup_finished();
+
         let dynamic_state = DynamicState {
             viewports: Some(vec![Viewport {
                 origin: [0.0, 0.0],
@@ -180,11 +183,46 @@ fn main () {
             }]),
             .. DynamicState::none()
         };
+
+        if recreate_swapchain {
+            dimensions = window.surface().capabilities(physical)
+                        .expect("failed to get surface capabilities")
+.current_extent.unwrap();
+
+            let (new_swapchain, new_images) = match swapchain.recreate_with_dimension(dimensions) {
+                Ok(r) => r,
+                // This error tends to happen when the user is manually resizing the window.
+                // Simply restarting the loop is the easiest way to fix this issue.
+                Err(SwapchainCreationError::UnsupportedDimensions) => {
+                    continue;
+                },
+                Err(err) => panic!("{:?}", err)
+            };
+
+            mem::replace(&mut swapchain, new_swapchain);
+            mem::replace(&mut images, new_images);
+            framebuffers = None;
+            recreate_swapchain = false;
+        }
+
+        if framebuffers.is_none() {
+            let new_framebuffers = Some(images.iter().map(|image| {
+                Arc::new(Framebuffer::start(renderpass.clone())
+                         .add(image.clone()).unwrap()
+                         .build().unwrap())
+            }).collect::<Vec<_>>());
+            mem::replace(&mut framebuffers, new_framebuffers);
+        }
+
         let (image_num, acquire_future) =
-            vulkano::swapchain::acquire_next_image(
-                swapchain.clone(),
-                None,
-            ).expect("failed to acquire swapchain in time");
+            match vulkano::swapchain::acquire_next_image( swapchain.clone(), None) {
+                Ok(r) => r,
+                Err(AcquireError::OutOfDate) => {
+                    recreate_swapchain = true;
+                    continue;
+                },
+                Err(err) => panic!("{:?}", err),
+            };
 
         let command_buffer = AutoCommandBufferBuilder
             ::new(
@@ -192,7 +230,7 @@ fn main () {
                 graphics_queue.family(),
             ).unwrap()
             .begin_render_pass(
-                framebuffers[image_num].clone(),
+                framebuffers.as_ref().unwrap()[image_num].clone(),
                 false,
                 vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],
             ).unwrap()
@@ -207,10 +245,24 @@ fn main () {
             .end_render_pass().unwrap()
             .build().unwrap();
 
-        acquire_future
+        let future = previous_frame_end.join(acquire_future)
             .then_execute(graphics_queue.clone(), command_buffer).unwrap()
+
+            // The color output is now expected to contain our triangle. But in order to show it on
+            // the screen, we have to *present* the image by calling `present`.
+            //
+            // This function does not actually present the image immediately. Instead it submits a
+            // present command at the end of the queue. This means that it will only be presented once
+            // the GPU has finished executing the command buffer that draws the triangle.
             .then_swapchain_present(graphics_queue.clone(), swapchain.clone(), image_num)
-            .then_signal_fence_and_flush().unwrap()
-            .wait(None).unwrap();
+            .then_signal_fence_and_flush().unwrap();
+        previous_frame_end = Box::new(future) as Box<_>;
+
+        events_loop.poll_events(|event| {
+            match event {
+                // TODO: handle events so that we can control the camera
+                _ => {},
+            }
+        });
     }
 }
