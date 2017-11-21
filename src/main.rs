@@ -27,8 +27,8 @@ use winit::EventsLoop;
 use winit::WindowBuilder;
 use std::sync::Arc;
 
-use shaders::vs;
-use shaders::fs;
+use shaders::mandelbrot::vs;
+use shaders::mandelbrot::fs;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -84,14 +84,18 @@ fn main () {
     // we just take the first queue we found. We should do something proper here in the future
     let graphics_queue = queues.next().unwrap();
 
+    let indices : [ u16; 6 ] = [0, 1, 2, 2, 3, 0] ;
 
-    let vertex1 = Vertex { position: [-0.5, -0.5] };
-    let vertex2 = Vertex { position: [ 0.0,  0.5] };
-    let vertex3 = Vertex { position: [ 0.5, -0.25] };
+    let vertices = [ 
+        Vertex { position: [ 1.0,  1.0] },
+        Vertex { position: [-1.0,  1.0] },
+        Vertex { position: [-1.0, -1.0] },
+        Vertex { position: [ 1.0, -1.0] },
+    ];
 
 
-    let vertex_buffer = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(),
-                                                    vec![vertex1, vertex2, vertex3].into_iter()).unwrap();
+    let index_buffer = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap();
+    let vertex_buffer = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap();
 
     let vs = vs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
     let fs = fs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
@@ -192,10 +196,11 @@ fn main () {
                 false,
                 vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],
             ).unwrap()
-            .draw(
+            .draw_indexed(
                 pipeline.clone(),
                 dynamic_state,
                 vertex_buffer.clone(),
+                index_buffer.clone(),
                 (),
                 (),
             ).unwrap()
