@@ -4,6 +4,7 @@ extern crate vulkano_shader_derive;
 extern crate vulkano;
 extern crate vulkano_win;
 extern crate winit;
+extern crate image;
 
 
 mod shaders;
@@ -28,11 +29,13 @@ use vulkano::swapchain::AcquireError;
 use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
+use winit::WindowEvent;
+use winit::Event;
 use std::sync::Arc;
 use std::mem;
 
-use shaders::mandelbrot::vs;
-use shaders::mandelbrot::fs;
+use shaders::plane::vs;
+use shaders::plane::fs;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -103,7 +106,7 @@ fn main () {
 
     let vs = vs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
     let fs = fs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
-    let mut dimensions;
+    let mut dimensions = [1024, 768];
 
     // TODO recreate swapchain on image resize with 
     // https://docs.rs/vulkano/0.7/vulkano/swapchain/index.html
@@ -114,7 +117,8 @@ fn main () {
             .capabilities(graphics_device.physical_device())
             .expect("failure to get surface capabilities");
         let format = caps.supported_formats[0].0;
-        dimensions = caps.current_extent.unwrap_or([1024, 768]);
+        println!("{:?}", caps.current_extent);
+        // dimensions = caps.current_extent.unwrap_or(dimensions);
         let usage = caps.supported_usage_flags;
         let present = caps.present_modes.iter().next().unwrap();
 
@@ -152,6 +156,31 @@ fn main () {
         ).unwrap(),
     );
 
+
+  let (texture, tex_future) = {
+        let image = image::load_from_memory_with_format(include_bytes!("../assets/feels_good.jpg"),
+                                                        image::ImageFormat::JPEG).unwrap().to_rgba();
+
+        let (width,height) = image.dimensions();
+        let image_data = image.into_raw().clone();
+
+        vulkano::image::immutable::ImmutableImage::from_iter(
+            image_data.iter().cloned(),
+            vulkano::image::Dimensions::Dim2d { width: width, height: height },
+            vulkano::format::R8G8B8A8Srgb,
+            graphics_queue.clone()).unwrap()
+    };
+
+
+    let sampler = vulkano::sampler::Sampler::new(graphics_device.clone(), vulkano::sampler::Filter::Linear,
+                                                 vulkano::sampler::Filter::Linear, vulkano::sampler::MipmapMode::Nearest,
+                                                 vulkano::sampler::SamplerAddressMode::Repeat,
+                                                 vulkano::sampler::SamplerAddressMode::Repeat,
+                                                 vulkano::sampler::SamplerAddressMode::Repeat,
+                                                 0.0, 1.0, 0.0, 0.0).unwrap();
+
+
+
    let pipeline = Arc::new(GraphicsPipeline::start()
         .vertex_input_single_buffer::<Vertex>()
         .vertex_shader(vs.main_entry_point(), ())
@@ -162,9 +191,16 @@ fn main () {
     .unwrap());
 
 
+    // add image to the set
+    let set = Arc::new(vulkano::descriptor::descriptor_set::PersistentDescriptorSet::start(pipeline.clone(), 0)
+        .add_sampled_image(texture.clone(), sampler.clone()).unwrap()
+        .build().unwrap()
+    );
+
+
     let mut framebuffers: Option<Vec<Arc<vulkano::framebuffer::Framebuffer<_,_>>>> = None;
     let mut recreate_swapchain = false;
-    let mut previous_frame_end = Box::new(now(graphics_device.clone())) as Box<GpuFuture>;
+    let mut previous_frame_end = Box::new(tex_future) as Box<GpuFuture>;
 
     loop {
 
@@ -178,16 +214,15 @@ fn main () {
         let dynamic_state = DynamicState {
             viewports: Some(vec![Viewport {
                 origin: [0.0, 0.0],
-                dimensions: [1024.0, 768.0],
+                dimensions: [dimensions[0] as f32, dimensions[1] as f32],
                 depth_range: 0.0 .. 1.0,
             }]),
             .. DynamicState::none()
         };
 
         if recreate_swapchain {
-            dimensions = window.surface().capabilities(physical)
-                        .expect("failed to get surface capabilities")
-.current_extent.unwrap();
+            // dimensions = window.surface().capabilities(physical)
+            //            .expect("failed to get surface capabilities").current_extent.unwrap();
 
             let (new_swapchain, new_images) = match swapchain.recreate_with_dimension(dimensions) {
                 Ok(r) => r,
@@ -218,6 +253,7 @@ fn main () {
             match vulkano::swapchain::acquire_next_image( swapchain.clone(), None) {
                 Ok(r) => r,
                 Err(AcquireError::OutOfDate) => {
+                    println!("out of date? lol no");
                     recreate_swapchain = true;
                     continue;
                 },
@@ -239,7 +275,7 @@ fn main () {
                 dynamic_state,
                 vertex_buffer.clone(),
                 index_buffer.clone(),
-                (),
+                set.clone(),
                 (),
             ).unwrap()
             .end_render_pass().unwrap()
@@ -260,6 +296,10 @@ fn main () {
 
         events_loop.poll_events(|event| {
             match event {
+                Event::WindowEvent{event: WindowEvent::Resized(width, height), ..} => {
+                    dimensions = [width, height];
+                    recreate_swapchain = true;
+                },
                 // TODO: handle events so that we can control the camera
                 _ => {},
             }
