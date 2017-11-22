@@ -9,44 +9,38 @@ extern crate image;
 
 mod shaders;
 
-use vulkano::sync::GpuFuture;
+use std::mem;
+use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
-use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;  
-use vulkano::command_buffer::DynamicState;
 use vulkano::command_buffer::CommandBuffer;
+use vulkano::command_buffer::DynamicState;
+use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
 use vulkano::device::DeviceExtensions;
+use vulkano::format::Format;
 use vulkano::framebuffer::Framebuffer;
 use vulkano::framebuffer::Subpass;
+use vulkano::image::Dimensions;
+use vulkano::image::StorageImage;
 use vulkano::instance::Instance;
 use vulkano::instance::PhysicalDevice;
-use vulkano::image::StorageImage;
-use vulkano::format::Format;
-use vulkano::image::Dimensions;
-use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::ComputePipeline;
+use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::viewport::Viewport;
+use vulkano::swapchain::AcquireError;
 use vulkano::swapchain::Swapchain;
 use vulkano::swapchain::SwapchainCreationError;
-use vulkano::swapchain::AcquireError;
+use vulkano::sync::GpuFuture;
 use vulkano_win::VkSurfaceBuild;
+use vulkano_win::Window;
+use winit::Event;
 use winit::EventsLoop;
 use winit::WindowBuilder;
 use winit::WindowEvent;
-use vulkano_win::Window;
-use winit::Event;
-use std::sync::Arc;
-use std::mem;
 
 
-#[derive(Copy, Clone)]
-struct Vertex {
-    position: [f32; 2],
-}
-
-impl_vertex!(Vertex, position);
 
 
 fn init_window(instance : Arc<Instance>) -> (EventsLoop, Window) {
@@ -59,24 +53,7 @@ fn init_window(instance : Arc<Instance>) -> (EventsLoop, Window) {
     (events_loop, window)
 }
 
-fn main () {
-    // find an instance of Vulkan that allows us to draw to a surface
-    let instance = Instance::new(
-        None, 
-        &vulkano_win::required_extensions(),
-        None
-    ).expect("No instance with surface extension");
-
-    // we select the first graphics device that we find.
-    // Perhaps we should do better
-    let physical = PhysicalDevice::enumerate(&instance)
-        .next()
-        .expect("no graphics device");
-
-    let (mut events_loop, window) = init_window(instance.clone());
-
-
-
+fn get_device(physical: &PhysicalDevice,  window: &Window) -> (std::sync::Arc<vulkano::device::Device>, std::sync::Arc<vulkano::device::Queue>) {
     // find a graphics device that supports drawing to a window surface
     let (graphics_device, mut queues) = {
         let graphical_queue_family = physical
@@ -97,14 +74,29 @@ fn main () {
 
     // we just take the first queue we found. We should do something proper here in the future
     let graphics_queue = queues.next().unwrap();
+    (graphics_device, graphics_queue)
+}
 
+fn main () {
+    // find an instance of Vulkan that allows us to draw to a surface
+    let instance = Instance::new(
+        None, 
+        &vulkano_win::required_extensions(),
+        None
+    ).expect("No instance with surface extension");
+
+    // we select the first graphics device that we find.
+    // Perhaps we should do better
+    let physical = PhysicalDevice::enumerate(&instance).next() .expect("no graphics device");
+    let (mut events_loop, window) = init_window(instance.clone());
+    let (device, queue) = get_device(&physical, &window);
     let mut dimensions = [1024, 768];
 
     let (mut swapchain, mut images) = {
         use vulkano::swapchain::SurfaceTransform;
         use vulkano::swapchain::CompositeAlpha;
         let caps = window.surface()
-            .capabilities(graphics_device.physical_device())
+            .capabilities(device.physical_device())
             .expect("failure to get surface capabilities");
         let format = caps.supported_formats[0].0;
         println!("{:?}", caps.current_extent);
@@ -113,14 +105,14 @@ fn main () {
         let present = caps.present_modes.iter().next().unwrap();
 
         Swapchain::new(
-            graphics_device.clone(),
+            device.clone(),
             window.surface().clone(),
             caps.min_image_count,
             format,
             dimensions,
             1,
             usage,
-            &graphics_queue,
+            &queue,
             SurfaceTransform::Identity,
             CompositeAlpha::Opaque,
             present,
@@ -131,7 +123,7 @@ fn main () {
 
     let renderpass = Arc::new(
         single_pass_renderpass!(
-            graphics_device.clone(), attachments: {
+            device.clone(), attachments: {
                 color: {
                     load: Clear,
                     store: Store,
@@ -147,10 +139,16 @@ fn main () {
     );
     use shaders::plane::vs;
     use shaders::plane::fs;
+    use shaders::mandelbrot::cs;
 
 
     let indices : [ u16; 6 ] = [0, 1, 2, 2, 3, 0] ;
 
+    #[derive(Copy, Clone)]
+    struct Vertex {
+        position: [f32; 2],
+    }
+    impl_vertex!(Vertex, position);
     let vertices = [ 
         Vertex { position: [ 1.0,  1.0] },
         Vertex { position: [-1.0,  1.0] },
@@ -158,13 +156,12 @@ fn main () {
         Vertex { position: [ 1.0, -1.0] },
     ];
 
-    let index_buffer = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap();
-    let vertex_buffer = CpuAccessibleBuffer::from_iter(graphics_device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap();
+    let index_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), indices.iter().cloned()).unwrap();
+    let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), vertices.iter().cloned()).unwrap();
 
-    let vs = vs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
-    let fs = fs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
-    let cs = shaders::mandelbrot::cs::Shader::load(graphics_device.clone()).expect("failed to create shader module");
-
+    let vs = vs::Shader::load(device.clone()).expect("failed to create shader module");
+    let fs = fs::Shader::load(device.clone()).expect("failed to create shader module");
+    let cs = cs::Shader::load(device.clone()).expect("failed to create shader module");
 
 
    let graphics_pipeline = Arc::new(GraphicsPipeline::start()
@@ -173,49 +170,41 @@ fn main () {
         .viewports_dynamic_scissors_irrelevant(1)
         .fragment_shader(fs.main_entry_point(), ())
         .render_pass(Subpass::from(renderpass.clone(), 0).unwrap())
-        .build(graphics_device.clone())
+        .build(device.clone())
     .unwrap());
 
-    let compute_pipeline = Arc::new(ComputePipeline::new(graphics_device.clone(), &cs.main_entry_point(), &()).unwrap());
+    let compute_pipeline = Arc::new(ComputePipeline::new(device.clone(), &cs.main_entry_point(), &()).unwrap());
 
-    let image = StorageImage::new(graphics_device.clone(), Dimensions::Dim2d { width: 1024, height: 1024 },
-                                Format::R8G8B8A8Unorm, Some(graphics_queue.family())).unwrap();
+    let image = StorageImage::new(device.clone(), Dimensions::Dim2d { width: 1024, height: 1024 },
+                                Format::R8G8B8A8Unorm, Some(queue.family())).unwrap();
+
+
+    let params_buffer = CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), cs::ty::Input {
+        center: [1.0, 0.0],
+        iter: 200,
+        scale: 1.0,
+    }).unwrap();
 
     let set = Arc::new(PersistentDescriptorSet::start(compute_pipeline.clone(), 0)
         .add_image(image.clone()).unwrap()
+        .add_buffer(params_buffer).unwrap()
         .build().unwrap()
     );
 
     let command_buffer =
-        AutoCommandBufferBuilder::new(graphics_device.clone(), graphics_queue.family()).unwrap()
+        AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap()
             .dispatch([1024 / 8, 1024 / 8, 1], compute_pipeline.clone(), set.clone(), ()).unwrap()
             .build().unwrap();
 
-    let future = command_buffer.execute(graphics_queue.clone()).unwrap();
-
-  /*let (texture, tex_future) = {
-        let image = image::load_from_memory_with_format(include_bytes!("../assets/feels_good.jpg"),
-                                                        image::ImageFormat::JPEG).unwrap().to_rgba();
-
-        let (width,height) = image.dimensions();
-        let image_data = image.into_raw().clone();
-
-        // TODO: instead use a CpuAccessibleBuffer, and every time make an ImmutableImage snapshot
-        vulkano::image::immutable::ImmutableImage::from_iter(
-            image_data.iter().cloned(),
-            vulkano::image::Dimensions::Dim2d { width: width, height: height },
-            vulkano::format::R8G8B8A8Srgb,
-            graphics_queue.clone()).unwrap()
-    };*/
+    let future = command_buffer.execute(queue.clone()).unwrap();
 
 
-    let sampler = vulkano::sampler::Sampler::new(graphics_device.clone(), vulkano::sampler::Filter::Linear,
+    let sampler = vulkano::sampler::Sampler::new(device.clone(), vulkano::sampler::Filter::Linear,
                                                  vulkano::sampler::Filter::Linear, vulkano::sampler::MipmapMode::Nearest,
                                                  vulkano::sampler::SamplerAddressMode::Repeat,
                                                  vulkano::sampler::SamplerAddressMode::Repeat,
                                                  vulkano::sampler::SamplerAddressMode::Repeat,
                                                  0.0, 1.0, 0.0, 0.0).unwrap();
-
 
 
     // add image to the set
@@ -289,8 +278,8 @@ fn main () {
 
         let command_buffer = AutoCommandBufferBuilder
             ::new(
-                graphics_device.clone(),
-                graphics_queue.family(),
+                device.clone(),
+                queue.family(),
             ).unwrap()
             .begin_render_pass(
                 framebuffers.as_ref().unwrap()[image_num].clone(),
@@ -309,7 +298,7 @@ fn main () {
             .build().unwrap();
 
         let future = previous_frame_end.join(acquire_future)
-            .then_execute(graphics_queue.clone(), command_buffer).unwrap()
+            .then_execute(queue.clone(), command_buffer).unwrap()
 
             // The color output is now expected to contain our triangle. But in order to show it on
             // the screen, we have to *present* the image by calling `present`.
@@ -317,15 +306,21 @@ fn main () {
             // This function does not actually present the image immediately. Instead it submits a
             // present command at the end of the queue. This means that it will only be presented once
             // the GPU has finished executing the command buffer that draws the triangle.
-            .then_swapchain_present(graphics_queue.clone(), swapchain.clone(), image_num)
+            .then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
             .then_signal_fence_and_flush().unwrap();
         previous_frame_end = Box::new(future) as Box<_>;
 
+         // TODO this is probably wrong
         events_loop.poll_events(|event| {
             match event {
-                Event::WindowEvent{event: WindowEvent::Resized(width, height), ..} => {
-                    dimensions = [width, height];
-                    recreate_swapchain = true;
+                Event::WindowEvent{event, ..} => match event {
+                    WindowEvent::Resized(width, height) => {
+                        dimensions = [width, height];
+                        recreate_swapchain = true;
+                    },
+                    WindowEvent::KeyboardInput{input,..} => {
+                    },
+                    _ => {},
                 },
                 // TODO: handle events so that we can control the camera
                 _ => {},
