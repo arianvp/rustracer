@@ -9,6 +9,7 @@ extern crate image;
 
 mod shaders;
 
+use std::time::{Duration, Instant};
 use std::mem;
 use std::sync::Arc;
 use vulkano::sync;
@@ -234,11 +235,14 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
 
-    let white_buffer: Vec<u8> = vec![0xff; 1024*1024*4];
-    let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
+    let mut white_buffer: Vec<u8> = vec![0x00; 1024*1024*4];
+    let mut sub_buffer = CpuAccessibleBuffer::from_iter(Arc::clone(&device),BufferUsage::all(), white_buffer.into_iter()).unwrap();
+    //let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
+
 
 
     loop {
+        let begin_time = Instant::now();
         previous_frame_end.cleanup_finished();
 
 
@@ -308,11 +312,13 @@ fn main() {
         // there is no AcceptsPixels<&u8> instance. Luckily u8 is Copy, and thus
         // we can iterate over the buffer by reference, but copy the underlying
         // elements, yielding a [u8] instead of an [&u8]
-        let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
+        // TODO: okay this is Fkin slow
+        //let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
+        
 
         let command_buffer =
             AutoCommandBufferBuilder ::new(device.clone(), queue.family()).unwrap()
-            .copy_buffer_to_image(sub_buffer, Arc::clone(&image)).unwrap()
+            .copy_buffer_to_image(sub_buffer.clone(), Arc::clone(&image)).unwrap()
             .begin_render_pass(framebuffers.as_ref().unwrap()[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],).unwrap()
             .draw_indexed(graphics_pipeline.clone(), dynamic_state, vertex_buffer.clone(), index_buffer.clone(), graphics_set.clone(), ()).unwrap()
             .end_render_pass().unwrap()
@@ -344,5 +350,12 @@ fn main() {
                 _ => {}
             }
         });
+
+        let frame_time = Instant::now().duration_since(begin_time);
+        let frame_time_seconds = frame_time.as_secs() as f64 + frame_time.subsec_nanos() as f64 / 1_000_000_000.0;
+        println!("{:?}", frame_time_seconds);
+    
+
+        
     }
 }
