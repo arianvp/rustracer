@@ -11,10 +11,11 @@ mod shaders;
 
 use std::mem;
 use std::sync::Arc;
+use vulkano::sync;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
+use vulkano::buffer::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
-use vulkano::command_buffer::CommandBuffer;
 use vulkano::command_buffer::DynamicState;
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
@@ -27,7 +28,6 @@ use vulkano::image::Dimensions;
 use vulkano::image::StorageImage;
 use vulkano::instance::Instance;
 use vulkano::instance::PhysicalDevice;
-use vulkano::pipeline::ComputePipeline;
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::sampler::Filter;
@@ -70,6 +70,8 @@ fn get_device(physical: &PhysicalDevice, window: &Window) -> (Arc<Device>, Arc<Q
                 q.supports_graphics() && window.surface().is_supported(q).unwrap_or(false)
             })
             .expect("couldn't find a graphic queue family");
+
+        // find a device with a swapchain
         let device_ext = DeviceExtensions {
             khr_swapchain: true,
             ..DeviceExtensions::none()
@@ -100,6 +102,8 @@ fn main() {
     );
     let (mut events_loop, window) = init_window(instance.clone());
     let (device, queue) = get_device(&physical, &window);
+
+    // find a device with a swapchain
     let mut dimensions = [1024, 768];
 
     let (mut swapchain, mut images) = {
@@ -149,7 +153,6 @@ fn main() {
 
     use shaders::plane::vs;
     use shaders::plane::fs;
-    use shaders::mandelbrot::cs;
 
 
     let indices: [u16; 6] = [0, 1, 2, 2, 3, 0];
@@ -177,7 +180,6 @@ fn main() {
 
     let vs = vs::Shader::load(device.clone()).expect("failed to create shader module");
     let fs = fs::Shader::load(device.clone()).expect("failed to create shader module");
-    let cs = cs::Shader::load(device.clone()).expect("failed to create shader module");
 
 
     let graphics_pipeline = Arc::new(
@@ -191,10 +193,6 @@ fn main() {
             .unwrap(),
     );
 
-    let compute_pipeline = Arc::new(
-        ComputePipeline::new(device.clone(), &cs.main_entry_point(), &())
-            .unwrap(),
-    );
 
     let image = StorageImage::new(
         device.clone(),
@@ -206,40 +204,6 @@ fn main() {
         Some(queue.family()),
     ).unwrap();
 
-
-    let params_buffer = CpuAccessibleBuffer::from_data(
-        device.clone(),
-        BufferUsage::all(),
-        cs::ty::Input {
-            center: [1.0, 0.0],
-            iter: 200,
-            scale: 1.0,
-        },
-    ).unwrap();
-
-    let set = Arc::new(
-        PersistentDescriptorSet::start(compute_pipeline.clone(), 0)
-            .add_image(image.clone())
-            .unwrap()
-            .add_buffer(params_buffer)
-            .unwrap()
-            .build()
-            .unwrap(),
-    );
-
-    let command_buffer = AutoCommandBufferBuilder::new(device.clone(), queue.family())
-        .unwrap()
-        .dispatch(
-            [1024 / 8, 1024 / 8, 1],
-            compute_pipeline.clone(),
-            set.clone(),
-            (),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
-
-    let future = command_buffer.execute(queue.clone()).unwrap();
 
 
     let sampler = Sampler::new(
@@ -257,11 +221,9 @@ fn main() {
     ).unwrap();
 
     // add image to the set
-    let set = Arc::new(
-        PersistentDescriptorSet::start(
-            graphics_pipeline.clone(),
-            0,
-        ).add_sampled_image(image.clone(), sampler.clone())
+    let graphics_set = Arc::new(
+        PersistentDescriptorSet::start(graphics_pipeline.clone(), 0)
+            .add_sampled_image(image.clone(), sampler.clone())
             .unwrap()
             .build()
             .unwrap(),
@@ -270,16 +232,15 @@ fn main() {
 
     let mut framebuffers: Option<Vec<Arc<Framebuffer<_, _>>>> = None;
     let mut recreate_swapchain = false;
-    let mut previous_frame_end = Box::new(future) as Box<GpuFuture>;
+    let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
+
+    let white_buffer: Vec<u8> = vec![0xff; 1024*1024*4];
+    let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
+
 
     loop {
-
-        // It is important to call this function from time to time, otherwise resources will keep
-        // accumulating and you will eventually reach an out of memory error.  Calling this
-        // function polls various fences in order to determine what the GPU has already processed,
-        // and frees the resources that are no longer needed.
-
         previous_frame_end.cleanup_finished();
+
 
         let dynamic_state = DynamicState {
             viewports: Some(vec![
@@ -341,10 +302,19 @@ fn main() {
                 Err(err) => panic!("{:?}", err),
             };
 
+        // here we do something interesting. We can not  just use `white_buffer`, as
+        // its ownership would be moved to the chunk function. However, we can not
+        // also borrow white_buffer, as then we also borrow its elements &u8, and 
+        // there is no AcceptsPixels<&u8> instance. Luckily u8 is Copy, and thus
+        // we can iterate over the buffer by reference, but copy the underlying
+        // elements, yielding a [u8] instead of an [&u8]
+        let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
+
         let command_buffer =
             AutoCommandBufferBuilder ::new(device.clone(), queue.family()).unwrap()
-            .begin_render_pass( framebuffers.as_ref().unwrap()[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],).unwrap()
-            .draw_indexed( graphics_pipeline.clone(), dynamic_state, vertex_buffer.clone(), index_buffer.clone(), set.clone(), ()).unwrap()
+            .copy_buffer_to_image(sub_buffer, Arc::clone(&image)).unwrap()
+            .begin_render_pass(framebuffers.as_ref().unwrap()[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],).unwrap()
+            .draw_indexed(graphics_pipeline.clone(), dynamic_state, vertex_buffer.clone(), index_buffer.clone(), graphics_set.clone(), ()).unwrap()
             .end_render_pass().unwrap()
             .build().unwrap();
 
@@ -366,7 +336,7 @@ fn main() {
                             dimensions = [width, height];
                             recreate_swapchain = true;
                         }
-                        WindowEvent::KeyboardInput { input, .. } => {}
+//                        WindowEvent::KeyboardInput { input, .. } => {}
                         _ => {}
                     }
                 }
