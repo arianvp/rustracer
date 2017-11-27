@@ -1,3 +1,4 @@
+
 #[macro_use]
 extern crate vulkano_shader_derive;
 #[macro_use]
@@ -7,9 +8,13 @@ extern crate winit;
 extern crate image;
 extern crate cgmath;
 
+extern crate simd;
+
 
 mod shaders;
 mod tracer;
+
+use tracer::camera::Camera;
 
 use std::time::{Duration, Instant};
 use std::mem;
@@ -93,6 +98,8 @@ fn get_device(physical: &PhysicalDevice, window: &Window) -> (Arc<Device>, Arc<Q
 }
 
 
+const WIDTH:usize = 1024;
+const HEIGHT:usize = 1024;
 fn main() {
     // find an instance of Vulkan that allows us to draw to a surface
     let instance = Instance::new(None, &vulkano_win::required_extensions(), None)
@@ -200,8 +207,8 @@ fn main() {
     let image = StorageImage::new(
         device.clone(),
         Dimensions::Dim2d {
-            width: 1024,
-            height: 1024,
+            width: WIDTH as u32,
+            height: HEIGHT as u32,
         },
         Format::R8G8B8A8Unorm,
         Some(queue.family()),
@@ -237,18 +244,23 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
 
-    let mut white_buffer: Vec<u8> = vec![0x00; 1024*1024*4];
+    let mut white_buffer: Vec<[u8;4]> = vec![[0,0,0,0]; WIDTH*HEIGHT];
     let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
+    let camera = Camera::new(WIDTH, HEIGHT);
 
 
     loop {
         let begin_time = Instant::now();
         previous_frame_end.cleanup_finished();
 
-        for x in white_buffer.iter_mut() {
-            *x += 1;
-        }
+        tracer::tracer(&camera, &mut white_buffer);
+        /*for x in white_buffer.iter_mut() {
+            x[0] += 1;
+            x[1] += 1;
+            x[2] += 1;
+            x[3] = 0;
+        }*/
 
 
         let dynamic_state = DynamicState {
