@@ -5,9 +5,11 @@ extern crate vulkano;
 extern crate vulkano_win;
 extern crate winit;
 extern crate image;
+extern crate cgmath;
 
 
 mod shaders;
+mod tracer;
 
 use std::time::{Duration, Instant};
 use std::mem;
@@ -97,7 +99,7 @@ fn main() {
         .expect("No instance with surface extension");
 
     // we select the first graphics device that we find.
-    // Perhaps we should do better
+    // TODO Perhaps we should do better
     let physical = PhysicalDevice::enumerate(&instance).next().expect(
         "no graphics device",
     );
@@ -236,14 +238,17 @@ fn main() {
     let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
 
     let mut white_buffer: Vec<u8> = vec![0x00; 1024*1024*4];
-    let mut sub_buffer = CpuAccessibleBuffer::from_iter(Arc::clone(&device),BufferUsage::all(), white_buffer.into_iter()).unwrap();
-    //let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
+    let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
 
 
     loop {
         let begin_time = Instant::now();
         previous_frame_end.cleanup_finished();
+
+        for x in white_buffer.iter_mut() {
+            *x += 1;
+        }
 
 
         let dynamic_state = DynamicState {
@@ -263,6 +268,7 @@ fn main() {
 
             let (new_swapchain, new_images) = match swapchain.recreate_with_dimension(dimensions) {
                 Ok(r) => r,
+                // TODO, this only happens sometimes. Why?
                 // This error tends to happen when the user is manually resizing the window.
                 // Simply restarting the loop is the easiest way to fix this issue.
                 Err(SwapchainCreationError::UnsupportedDimensions) => {
@@ -312,8 +318,7 @@ fn main() {
         // there is no AcceptsPixels<&u8> instance. Luckily u8 is Copy, and thus
         // we can iterate over the buffer by reference, but copy the underlying
         // elements, yielding a [u8] instead of an [&u8]
-        // TODO: okay this is Fkin slow
-        //let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
+        let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
         
 
         let command_buffer =
