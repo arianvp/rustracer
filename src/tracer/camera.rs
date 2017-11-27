@@ -55,7 +55,6 @@ impl Camera {
         self.right = unit_y.cross(self.direction);
         self.up = self.direction.cross(self.right);
 
-        let mut ray = Ray::new(self.origin, self.direction, f32::INFINITY);
 
         let aspect_ratio = (self.width as f32) / (self.height as f32);
 
@@ -88,9 +87,6 @@ impl Camera {
         let origin = self.origin + self.lens_size * (self.right + self.up);
         let direction = (target - origin).normalize();
 
-        // hmm all directions are the same. that seems to be a bug =)
-
-        Ray::new(origin, direction, f32::INFINITY)
-
+        Ray{origin, direction}
     }
 }
