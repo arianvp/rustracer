@@ -3,6 +3,7 @@ use self::cgmath::{Vector3, Point3};
 use std::f32;
 
 
+
 #[derive(Debug, Copy, Clone)]
 pub struct Ray {
     pub origin: Point3<f32>,

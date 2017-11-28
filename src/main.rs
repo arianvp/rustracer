@@ -15,6 +15,7 @@ mod shaders;
 mod tracer;
 
 use tracer::camera::Camera;
+use tracer::scene::Scene;
 
 use std::time::{Duration, Instant};
 use std::mem;
@@ -98,8 +99,8 @@ fn get_device(physical: &PhysicalDevice, window: &Window) -> (Arc<Device>, Arc<Q
 }
 
 
-const WIDTH:usize = 1024;
-const HEIGHT:usize = 1024;
+const WIDTH: usize = 1024;
+const HEIGHT: usize = 1024;
 fn main() {
     // find an instance of Vulkan that allows us to draw to a surface
     let instance = Instance::new(None, &vulkano_win::required_extensions(), None)
@@ -244,9 +245,10 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
 
-    let mut white_buffer: Vec<[u8;4]> = vec![[0,0,0,0]; WIDTH*HEIGHT];
+    let mut white_buffer: Vec<[u8; 4]> = vec![[0, 0, 0, 0]; WIDTH * HEIGHT];
     let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
+    let scene = Scene::new();
     let mut camera = Camera::new(WIDTH, HEIGHT);
 
 
@@ -254,13 +256,7 @@ fn main() {
         let begin_time = Instant::now();
         previous_frame_end.cleanup_finished();
 
-        tracer::tracer(&camera, &mut white_buffer);
-        /*for x in white_buffer.iter_mut() {
-            x[0] += 1;
-            x[1] += 1;
-            x[2] += 1;
-            x[3] = 0;
-        }*/
+        tracer::tracer(&camera, &scene, &mut white_buffer);
 
 
         let dynamic_state = DynamicState {
@@ -326,12 +322,12 @@ fn main() {
 
         // here we do something interesting. We can not  just use `white_buffer`, as
         // its ownership would be moved to the chunk function. However, we can not
-        // also borrow white_buffer, as then we also borrow its elements &u8, and 
+        // also borrow white_buffer, as then we also borrow its elements &u8, and
         // there is no AcceptsPixels<&u8> instance. Luckily u8 is Copy, and thus
         // we can iterate over the buffer by reference, but copy the underlying
         // elements, yielding a [u8] instead of an [&u8]
         let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
-        
+
 
         let command_buffer =
             AutoCommandBufferBuilder ::new(device.clone(), queue.family()).unwrap()
@@ -371,10 +367,11 @@ fn main() {
         });
 
         let frame_time = Instant::now().duration_since(begin_time);
-        let frame_time_seconds = frame_time.as_secs() as f64 + frame_time.subsec_nanos() as f64 / 1_000_000_000.0;
+        let frame_time_seconds = frame_time.as_secs() as f64 +
+            frame_time.subsec_nanos() as f64 / 1_000_000_000.0;
         println!("{:?}", frame_time_seconds);
-    
 
-        
+
+
     }
 }
