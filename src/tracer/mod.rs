@@ -1,13 +1,15 @@
 pub mod camera;
 pub mod ray;
-use cgmath::EuclideanSpace;
+use cgmath::{EuclideanSpace, InnerSpace};
 use cgmath::{Vector3, Point3};
 use std::f32;
+use std::cmp::Ordering;
+
 
 use self::ray::Ray;
 use self::camera::Camera;
 
-
+#[derive(Debug, Copy, Clone)]
 struct Intersection {
     distance: f32, // here for convenience
     intersection: Point3<f32>,
@@ -15,19 +17,32 @@ struct Intersection {
     material: Material,
 }
 
-pub struct Light {
-    pub position: Point3<f32>,
-    pub intensity: f32,
+#[derive(Debug, Copy, Clone)]
+struct Light {
+   position: Point3<f32>,
+   intensity: f32,
 }
 
-pub struct Sphere {
-    pub position: Point3<f32>,
-    pub radius: f32,
-    pub material: Material,
+#[derive(Debug, Copy, Clone)]
+struct Sphere {
+    position: Point3<f32>,
+    radius: f32,
+    material: Material,
+}
+
+
+#[derive(Debug, Copy, Clone)]
+struct Material {
+    color: Vector3<f32>,
+}
+
+struct Scene {
+    spheres: [Sphere;1],
+    lights: [Light;1],
 }
 
 impl Sphere {
-    fn intersect(&self, ray: Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let distance = self.position - ray.origin;
         let tca = distance.dot(ray.direction);
         if tca < 0.0 {
@@ -68,26 +83,45 @@ impl Sphere {
     }
 }
 
-struct Scene {
-    spheres: [Sphere],
-    lights: [Light],
-}
-// currently only Phong shaded materials
-struct Material {
-    speculaty: f32,
-    color: Vector3<f32>,
-}
-
-
+const SCENE: Scene = Scene {
+    lights: [
+        Light {
+            intensity: 0.8,
+            position: Point3 {
+                x: 0.0,
+                y: 2.0,
+                z: 1.0,
+            },
+        },
+    ],
+    spheres: [
+        Sphere {
+            material: Material {
+                color: Vector3 {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            },
+            position: Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            radius: 0.5,
+        },
+    ],
+};
 // TODO: clamp or bugs will be
 pub fn tracer(camera: &Camera, buffer: &mut Vec<[u8; 4]>) {
     for y in 0..camera.width {
         for x in 0..camera.height {
             let ray = camera.generate(x, y);
-            let color = cast(ray);
-            /*buffer[idx][0] = (255.0 * color[0]) as u8;
+            let color = trace(&SCENE, ray);
+            let idx = x+y*camera.height;
+            buffer[idx][0] = (255.0 * color[0]) as u8;
             buffer[idx][1] = (255.0 * color[1]) as u8;
-            buffer[idx][2] = (255.0 * color[2]) as u8;*/
+            buffer[idx][2] = (255.0 * color[2]) as u8;
         }
     }
 
@@ -96,36 +130,33 @@ pub fn tracer(camera: &Camera, buffer: &mut Vec<[u8; 4]>) {
 // what a beauty
 fn nearest_intersection(scene: &Scene, ray: Ray) -> Option<Intersection> {
     scene
-        .circles
+        .spheres
         .iter()
-        .filter_map(|circle| circle.intersect(ray))
-        .max_by_key(|intersection| intersection.distance)
-        .next()
+        .filter_map(|circle| circle.intersect(&ray))
+        .min_by(|a,b| a.distance.partial_cmp(&b.distance).unwrap_or(Ordering::Equal))
 }
 
 fn direct_illumination(
-    scence: &Scene,
+    scene: &Scene,
     ray_direction: Vector3<f32>,
-    position: Vector3<f32>,
-    normal: Vector3<f32>,
-    material: Material,
+    intersection: Intersection,
 ) -> Vector3<f32> {
     scene.lights.iter().fold(
-        Vector3::new(0, 0, 0),
-        |specular_color, light| {
-            let light_direction = light.position - position;
-            let light_distance2 = light_direction.dot(light_direction);
+        Vector3::new(0.0, 0.0, 0.0),
+        |color, light| {
+            // simple lambertian surface
+            let light_direction = light.position - intersection.intersection;
             let light_direction = light_direction.normalize();
-            let l_dot_n = max(0.0, light_direction.dot(nornal));
-            let light_amount = light.intensity * l_dot_n;
-            let reflection_direction = -light_direction.reflect(normal);
-            f32::max(0.0, -reflection_direction.dot(ray_direction)).pow(material.specular_exp) *
-                light.intensity;
 
+            // TODO can be negative
+            let l_dot_n = f32::max(0.0,light_direction.dot(intersection.normal));
+            color + intersection.material.color * light.intensity * l_dot_n
         },
-    );
+    )
 }
 
-fn trace(scence: &Scene, ray: Ray) -> Vector3<f32> {
-    let intersection = nearest_intersection(scene, ray);
+fn trace(scene: &Scene, ray: Ray) -> Vector3<f32> {
+    nearest_intersection(scene, ray)
+        .map(|i| direct_illumination(scene, ray.direction, i))
+        .unwrap_or(Vector3::new(0.0, 0.0, 0.0))
 }
