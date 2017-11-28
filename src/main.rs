@@ -247,7 +247,7 @@ fn main() {
     let mut white_buffer: Vec<[u8;4]> = vec![[0,0,0,0]; WIDTH*HEIGHT];
     let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
-    let camera = Camera::new(WIDTH, HEIGHT);
+    let mut camera = Camera::new(WIDTH, HEIGHT);
 
 
     loop {
@@ -359,7 +359,9 @@ fn main() {
                             dimensions = [width, height];
                             recreate_swapchain = true;
                         }
-//                        WindowEvent::KeyboardInput { input, .. } => {}
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            camera.handle_input(input.virtual_keycode.unwrap());
+                        }
                         _ => {}
                     }
                 }

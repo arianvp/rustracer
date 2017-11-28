@@ -30,6 +30,12 @@ struct Sphere {
     material: Material,
 }
 
+struct Plane {
+    normal: Vector3<f32>,
+    distance: f32,
+    material: Material,
+}
+
 
 #[derive(Debug, Copy, Clone)]
 struct Material {
@@ -39,6 +45,43 @@ struct Material {
 struct Scene {
     spheres: [Sphere;1],
     lights: [Light;1],
+}
+
+trait Primitive {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection>;
+}
+
+impl Plane {
+    fn new(p1: Point3<f32>, p2: Point3<f32>, p3: Point3<f32>, material: Material)  -> Plane{
+        let normal = (p3 - p1).cross(p2 - p1).normalize();
+        Plane{
+            normal,
+            distance: -1.0*normal.dot(p1 - Point3::new(0.0,0.0,0.0)),
+            material,
+        }
+    }
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+        //let distance = self.position - ray.origin;
+        let denom = ray.direction.dot(self.normal);
+        if denom < f32::EPSILON {
+            None
+        } else {
+            let t = (ray.origin.dot(self.normal) + self.distance) / ray.direction.dot(self.normal);
+            let p = ray.origin + t * ray.direction;
+
+            let distance = (p - ray.origin).magnitude();
+            if t >= 0.0 {
+                Some(Intersection{
+                distance: distance ,
+                intersection: p, 
+                normal: self.normal,
+                material: self.material,
+                })
+            } else {
+                None
+            }
+        }
+    }
 }
 
 impl Sphere {
@@ -86,7 +129,7 @@ impl Sphere {
 const SCENE: Scene = Scene {
     lights: [
         Light {
-            intensity: 0.8,
+            intensity: 2.0,
             position: Point3 {
                 x: 0.0,
                 y: 2.0,
@@ -146,11 +189,17 @@ fn direct_illumination(
         |color, light| {
             // simple lambertian surface
             let light_direction = light.position - intersection.intersection;
+            let light_distance = light_direction.magnitude();
             let light_direction = light_direction.normalize();
+
+            // take light distance into consideration
 
             // TODO can be negative
             let l_dot_n = f32::max(0.0,light_direction.dot(intersection.normal));
-            color + intersection.material.color * light.intensity * l_dot_n
+
+
+
+            color + ((intersection.material.color  * light.intensity * l_dot_n) / (light_distance * light_distance))
         },
     )
 }

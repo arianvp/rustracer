@@ -1,6 +1,7 @@
 use cgmath::{Vector3, Point3, Array};
 use cgmath::InnerSpace;
 use cgmath::ElementWise;
+use winit::VirtualKeyCode;
 use super::ray::Ray;
 use std::f32;
 
@@ -49,7 +50,7 @@ impl Camera {
     }
 
 
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         self.direction = (self.target - self.origin).normalize();
         let unit_y = Vector3::new(0.0, 1.0, 0.0);
         self.right = unit_y.cross(self.direction);
@@ -69,6 +70,39 @@ impl Camera {
         self.p3 = c + (-0.5 * self.focal_distance * aspect_ratio * self.right) +
             (-0.5 * self.focal_distance * self.up);
 
+    }
+
+    pub fn handle_input(&mut self, keycode: VirtualKeyCode) {
+        match keycode {
+            VirtualKeyCode::W => {
+                self.origin += (0.1 * self.direction);
+            },
+            VirtualKeyCode::A => {
+                self.origin = self.origin + (-0.1 * self.right);
+                self.target = self.target + (-0.1 * self.right);
+            },
+            VirtualKeyCode::S => {
+                self.origin += (-0.1 * self.direction);
+            },
+            VirtualKeyCode::D => {
+                self.origin = self.origin + (0.1 * self.right);
+                self.target = self.target + (0.1 * self.right);
+            },
+            VirtualKeyCode::Up => {
+                self.target = self.target + (-0.1 * self.up);
+            },
+            VirtualKeyCode::Down => {
+                self.target = self.target + (0.1 * self.up);
+            },
+            VirtualKeyCode::Left => {
+                self.target = self.target + (-0.1 * self.right);
+            },
+            VirtualKeyCode::Right => {
+                self.target = self.target + (0.1 * self.right);
+            },
+            _ => {},
+        }
+        self.update();
     }
 
 
