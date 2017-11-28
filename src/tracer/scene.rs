@@ -12,17 +12,22 @@ impl Scene {
             lights: vec![
                 Light {
                     intensity: 2.0,
-                    position: Point3::new(0.0, 2.0, 1.0),
+                    position: Point3::new(0.0, 3.0, 0.0),
                 },
+                /*Light {
+                    intensity: 2.0,
+                    position: Point3::new(0.0, -2.0, 0.0),
+                },*/
             ],
             primitives: vec![
-                Primitive::plane(Point3::new(0.0,0.0,-1.0), Point3::new(0.0,1.0, -1.0), Point3::new(1.0,0.0,-1.0), Material{color:Vector3::new(0.0,1.0,0.0)}),
-                Primitive::Plane{distance: -1.0, normal: Vector3::new(0.0, -1.0, 0.0), material: Material{ color: Vector3::new(0.0, 1.0, 0.0)}},
+                Primitive::Plane{
+                    p0: Point3::new(0.0, 0.0, 0.0),
+                    normal: Vector3::new(0.0, 1.0, 0.0),
+                    material: Material { color: Vector3::new(0.0, 1.0, 0.0) },
+                },
                 Primitive::Sphere {
-                    material: Material {
-                        color: Vector3::new(1.0, 0.0, 0.0),
-                    },
-                    position: Point3::new(0.0, 0.0, 0.0 ),
+                    material: Material { color: Vector3::new(1.0, 0.0, 0.0) },
+                    position: Point3::new(0.0, 0.0, 0.0),
                     radius: 0.5,
                 },
             ],

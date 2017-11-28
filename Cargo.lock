@@ -618,6 +618,7 @@ name = "testit"
 version = "0.1.0"
 dependencies = [
  "cgmath 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "half 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "simd 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vulkano 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",

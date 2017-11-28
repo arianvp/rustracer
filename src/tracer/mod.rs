@@ -9,23 +9,32 @@ use std::f32;
 use std::cmp::Ordering;
 
 
+use half::f16;
 use self::scene::Scene;
 use self::ray::Ray;
 use self::camera::Camera;
 use self::primitive::{Light, Primitive, Material, Intersection};
 
+//use stdsimd::simd::u8x16;
+//use stdsimd::vendor::_mm_adds_epu8;
+
 
 // TODO: clamp or bugs will be
-pub fn tracer(camera: &Camera, scene: &Scene, buffer: &mut Vec<[u8; 4]>) {
+pub fn tracer(camera: &Camera, scene: &Scene, buffer: &mut Vec<[f16; 4]>) {
     for y in 0..camera.width {
         for x in 0..camera.height {
             let ray = camera.generate(x, y);
             let color = trace(scene, ray);
             let idx = x + y * camera.height;
+            buffer[idx][0] = f16::from_f32(color[0]);
+            buffer[idx][1] = f16::from_f32(color[1]);
+            buffer[idx][2] = f16::from_f32(color[2]);
             // TODO we can use the saturated-add instruction here
-            buffer[idx][0] = f32::min(255.0,(255.0 * color[0])) as u8;
-            buffer[idx][1] = f32::min(255.0,(255.0 * color[1])) as u8;
-            buffer[idx][2] = f32::min(255.0,(255.0 * color[2])) as u8;
+            /*
+             buffer[idx][0] = u8::max(0,u16::min(256, f32::floor(color[0] * 256.0) as u16) as u8);
+            buffer[idx][1] = u8::max(0,u16::min(256, f32::floor(color[1] * 256.0) as u16) as u8);
+            buffer[idx][2] = u8::max(0,u16::min(256, f32::floor(color[2] * 256.0) as u16) as u8);*/
+
         }
     }
 
@@ -59,14 +68,10 @@ fn direct_illumination(
 
             // take light distance into consideration
 
-            // TODO can be negative
             let l_dot_n = f32::max(0.0, light_direction.dot(intersection.normal));
 
 
-
-            color +
-                ((intersection.material.color * light.intensity * l_dot_n) /
-                     (light_distance * light_distance))
+            0.01 * l_dot_n * intersection.material.color
         },
     )
 }
