@@ -11,10 +11,23 @@ pub struct Intersection {
     pub material: Material,
 }
 
+impl Intersection {
+    pub fn brdf(&self, light: &Light) -> Vector3<f32> {
+        // simple lambertian surface
+        let light_direction = light.position - self.intersection;
+        let light_distance = light_direction.magnitude();
+        let light_direction = light_direction.normalize();
+
+        let l_dot_n = f32::max(0.0, light_direction.dot(self.normal));
+        (light.intensity * l_dot_n * self.material.color) / (light_distance * light_distance)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Material {
     pub color: Vector3<f32>,
 }
+
 
 #[derive(Debug, Copy, Clone)]
 pub struct Light {

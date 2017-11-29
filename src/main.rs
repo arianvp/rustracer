@@ -64,7 +64,7 @@ fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
     let events_loop = EventsLoop::new();
     let window = WindowBuilder::new()
         .with_decorations(true)
-        .with_dimensions(1024, 768)
+        .with_dimensions(1024, 1024)
         .build_vk_surface(&events_loop, instance.clone())
         .expect("failed to build window");
     (events_loop, window)

@@ -11,7 +11,7 @@ impl Scene {
         Scene {
             lights: vec![
                 Light {
-                    intensity: 2.0,
+                    intensity: 1.0,
                     position: Point3::new(0.0, 3.0, 0.0),
                 },
                 /*Light {
@@ -27,8 +27,13 @@ impl Scene {
                 },
                 Primitive::Sphere {
                     material: Material { color: Vector3::new(1.0, 0.0, 0.0) },
-                    position: Point3::new(0.0, 0.0, 0.0),
+                    position: Point3::new(0.0, 1.0, 0.0),
                     radius: 0.5,
+                },
+                Primitive::Sphere {
+                    material: Material { color: Vector3::new(1.0, 1.0, 0.0) },
+                    position: Point3::new(1.0, 1.0, 0.0),
+                    radius: 0.3,
                 },
             ],
         }
