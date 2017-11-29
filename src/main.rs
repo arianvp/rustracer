@@ -9,7 +9,7 @@ extern crate image;
 extern crate cgmath;
 
 extern crate simd;
-extern crate half;
+
 
 mod shaders;
 mod tracer;
@@ -211,7 +211,7 @@ fn main() {
             width: WIDTH as u32,
             height: HEIGHT as u32,
         },
-        Format::R16G16B16A16Sfloat,
+        Format::R8G8B8A8Unorm,
         Some(queue.family()),
     ).unwrap();
 
@@ -245,7 +245,7 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
 
-    let mut white_buffer: Vec<[half::f16; 4]> = vec![[half::f16::from_f32(0.0), half::f16::from_f32(0.0),half::f16::from_f32(0.0),half::f16::from_f32(0.0)]; WIDTH * HEIGHT];
+    let mut white_buffer: Vec<[u8; 4]> = vec![[0, 0, 0, 0]; WIDTH * HEIGHT];
     let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
     let scene = Scene::new();
