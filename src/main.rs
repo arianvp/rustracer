@@ -13,6 +13,7 @@ extern crate half;
 
 mod shaders;
 mod tracer;
+mod vec;
 
 use tracer::camera::Camera;
 use tracer::scene::Scene;

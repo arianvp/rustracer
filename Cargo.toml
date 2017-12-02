@@ -12,3 +12,7 @@ image = "*"
 cgmath = "*"
 simd = "*"
 half = "*"
+
+[profile.release]
+debug = true
+

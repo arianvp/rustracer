@@ -2,6 +2,15 @@ use cgmath::{Vector3, Point3};
 use cgmath::{EuclideanSpace, InnerSpace};
 use super::ray::Ray;
 use std::f32;
+use std::mem;
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Material {
+    pub color: Vector3<f32>,
+    pub spec: f32,
+}
+
 
 #[derive(Debug, Copy, Clone)]
 pub struct Intersection {
@@ -11,22 +20,6 @@ pub struct Intersection {
     pub material: Material,
 }
 
-impl Intersection {
-    pub fn brdf(&self, light: &Light) -> Vector3<f32> {
-        // simple lambertian surface
-        let light_direction = light.position - self.intersection;
-        let light_distance = light_direction.magnitude();
-        let light_direction = light_direction.normalize();
-
-        let l_dot_n = f32::max(0.0, light_direction.dot(self.normal));
-        (light.intensity * l_dot_n * self.material.color) / (light_distance * light_distance)
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Material {
-    pub color: Vector3<f32>,
-}
 
 
 #[derive(Debug, Copy, Clone)]
@@ -90,31 +83,30 @@ impl Primitive {
                     return None;
                 }
                 let thc = (radius * radius - d2).sqrt();
-                let t0 = tca - thc;
-                let t1 = tca + thc;
-                if t0 >= 0.0 {
-                    let distance = t0;
-                    let intersection = ray.origin + ray.direction * t0;
-                    let normal = intersection - position;
-                    Some(Intersection {
-                        material,
-                        normal,
-                        intersection,
-                        distance,
-                    })
-                } else if t1 >= 0.0 {
-                    let distance = t1;
-                    let intersection = ray.origin + ray.direction * t1;
-                    let normal = intersection - position;
-                    Some(Intersection {
-                        material,
-                        normal,
-                        intersection,
-                        distance,
-                    })
-                } else {
-                    None
+                let mut t0 = tca - thc;
+                let mut t1 = tca + thc;
+                // NOTE: used swap trick from Scratchapixel. It actually gives us a bit better
+                // frame rate! 
+                // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/minimal-ray-tracer-rendering-spheres
+                if t0 > t1 {
+                    mem::swap(&mut t0, &mut t1)
                 }
+                if t0 < 0.0 {
+                    t0 = t1;
+                    if t0 < 0.0 {
+                        return None;
+                    }
+                }
+                let distance = t0;
+                let intersection = ray.origin + ray.direction * t0;
+                let normal = (intersection - position).normalize();
+                Some(Intersection {
+                    material,
+                    normal,
+                    // NOTE: I added a little bit of Bias, or we would reintersect the ball
+                    intersection: intersection + normal * 1e-4,
+                    distance,
+                })
             }
         }
     }
