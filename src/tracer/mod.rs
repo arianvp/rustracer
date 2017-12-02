@@ -79,24 +79,25 @@ fn schlick(direction: Vector3<f32>, normal: Vector3<f32>, n1: f32, n2: f32) -> f
 }
 
 fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
-    nearest_intersection(scene, ray)
-        .map(|i| {
-            let s = i.material.spec;
-            let d = 1.0 - s;
-            let reflection = if depth > 0 {
-                trace(
-                    scene,
-                    Ray {
-                        origin: i.intersection,
-                        direction: reflect(ray.direction, i.normal),
-                    },
-                    depth - 1,
-                )
-            } else {
-                Vector3::new(0.0, 0.0, 0.0)
-            };
-
-            ((s * reflection) + (d * direct_illumination(scene, i)))
-        })
-        .unwrap_or(Vector3::new(0.0, 0.0, 0.0))
+    let mut ray = ray.clone();
+    let mut a = 1.0;
+    let mut color = Vector3::new(0.0,0.0,0.0);
+    for _ in 0..depth {
+        match nearest_intersection(scene, ray) {
+            None => {
+                break;
+            },
+            Some(i) => {
+                let s = i.material.spec;
+                let d = 1.0 - s;
+                color += a*d*direct_illumination(scene, i);
+                a *= s;
+                ray = Ray {
+                    origin: i.intersection,
+                    direction: reflect(ray.direction, i.normal),
+                }
+            },
+        }
+    }
+    color
 }

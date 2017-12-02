@@ -18,6 +18,7 @@ pub struct Intersection {
     pub intersection: Point3<f32>,
     pub normal: Vector3<f32>,
     pub material: Material,
+    pub inside: bool, // Whether we are inside the object or not. Used in refractions
 }
 
 
@@ -58,6 +59,7 @@ impl Primitive {
                         Some(Intersection {
                             material,
                             normal,
+                            inside: false,  // inside-ness is not important for planes
                             distance,
                             intersection: ray.origin + (distance * ray.direction),
                         })
@@ -82,6 +84,7 @@ impl Primitive {
                 if d2 > radius * radius {
                     return None;
                 }
+                let mut inside = false;
                 let thc = (radius * radius - d2).sqrt();
                 let mut t0 = tca - thc;
                 let mut t1 = tca + thc;
@@ -93,6 +96,7 @@ impl Primitive {
                 }
                 if t0 < 0.0 {
                     t0 = t1;
+                    inside = true;
                     if t0 < 0.0 {
                         return None;
                     }
@@ -103,6 +107,7 @@ impl Primitive {
                 Some(Intersection {
                     material,
                     normal,
+                    inside,
                     // NOTE: I added a little bit of Bias, or we would reintersect the ball
                     intersection: intersection + normal * 1e-4,
                     distance,
