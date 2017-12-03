@@ -138,8 +138,7 @@ impl Primitive {
                     material,
                     normal,
                     inside: false,
-                    // NOTE: I added a little bit of Bias, or we would reintersect the ball
-                    intersection: intersection + normal * 1e-4,
+                    intersection: intersection,
                     distance: t,
                 })
             }

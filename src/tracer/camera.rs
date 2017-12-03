@@ -88,6 +88,22 @@ impl Camera {
                 self.origin = self.origin + (0.1 * self.right);
                 self.target = self.target + (0.1 * self.right);
             },
+            VirtualKeyCode::E => {
+                self.origin = self.origin + 10.0 * self.direction;
+                self.target = self.target + 10.0 * self.direction;
+            },
+            VirtualKeyCode::Q => {
+                self.origin = self.origin + -10.0 * self.direction;
+                self.target = self.target + -10.0 * self.direction;
+            },
+            VirtualKeyCode::R => {
+                self.origin = self.origin + (0.1 * self.up);
+                self.target = self.target + (0.1 * self.up);
+            },
+            VirtualKeyCode::F => {
+                self.origin = self.origin + (-0.1 * self.up);
+                self.target = self.target + (-0.1 * self.up);
+            },
             VirtualKeyCode::Up => {
                 self.target = self.target + (-0.1 * self.up);
             },
