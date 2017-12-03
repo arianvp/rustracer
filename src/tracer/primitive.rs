@@ -6,9 +6,17 @@ use std::mem;
 
 
 #[derive(Debug, Copy, Clone)]
-pub struct Material {
-    pub color: Vector3<f32>,
-    pub spec: f32,
+pub enum Material { 
+    Conductor {
+        color: Vector3<f32>,
+        spec: f32,
+    },
+    Dielectric {
+        absorb: Vector3<f32>,
+        n1: f32,  // TODO: we should just have 1 n, and keep track in the tracer what the transitions are
+        n2: f32,
+
+    }
 }
 
 

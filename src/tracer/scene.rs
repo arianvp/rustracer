@@ -23,15 +23,15 @@ impl Scene {
                 Primitive::Plane{
                     p0: Point3::new(0.0, 0.0, 0.0),
                     normal: Vector3::new(0.0, 1.0, 0.0),
-                    material: Material{ spec: 0.96, color: Vector3::new(0.0, 1.0, 0.0) },
+                    material: Material::Conductor{ spec: 0.96, color: Vector3::new(0.0, 1.0, 0.0) },
                 },
                 Primitive::Sphere {
-                    material: Material{ spec: 1.0, color: Vector3::new(1.0, 0.0, 0.0) },
+                    material: Material::Conductor{ spec: 0.3, color: Vector3::new(1.0, 0.0, 0.0) },
                     position: Point3::new(0.0, 1.0, 0.0),
                     radius: 0.5,
                 },
                 Primitive::Sphere {
-                    material: Material{ spec: 0.0, color: Vector3::new(0.0, 0.0, 1.0) },
+                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.0, 0.0, 1.0) },
                     position: Point3::new(1.0, 1.0, 0.0),
                     radius: 0.3,
                 },

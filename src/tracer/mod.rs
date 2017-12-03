@@ -41,37 +41,60 @@ fn nearest_intersection(scene: &Scene, ray: Ray) -> Option<Intersection> {
             )
         })
 }
-pub fn brdf(i: &Intersection, light: &Light) -> f32 {
-    let light_direction = light.position - i.intersection;
+pub fn brdf(intersection: Point3<f32>, normal: Vector3<f32>, light: &Light) -> f32 {
+    let light_direction = light.position - intersection;
     let light_distance = light_direction.magnitude();
     let light_direction = light_direction.normalize();
-    let l_dot_n = f32::max(0.0, light_direction.dot(i.normal));
+    let l_dot_n = f32::max(0.0, light_direction.dot(normal));
     (light.intensity * l_dot_n) / (light_distance * light_distance)
 }
 
-// Actually not dependend on material
-fn direct_illumination(scene: &Scene, intersection: Intersection) -> Vector3<f32> {
+fn direct_illumination(scene: &Scene, intersection: Point3<f32>, normal: Vector3<f32>, color: Vector3<f32>) -> Vector3<f32> {
     scene.lights.iter().fold(
         Vector3::new(0.0, 0.0, 0.0),
-        |color, light| {
-            let origin = intersection.intersection;
-            let direction = (light.position - intersection.intersection).normalize();
+        |accum, light| {
+            let origin = intersection;
+            let direction = (light.position - intersection).normalize();
             let ray = Ray { origin, direction };
             let to_mul = if nearest_intersection(scene, ray).is_some() {
                 Vector3::new(0.0, 0.0, 0.0)
             } else {
-                brdf(&intersection, light) * intersection.material.color
+                brdf(intersection, normal, light) * color
             };
 
-            color + to_mul
+            accum + to_mul
         },
     )
 }
 
+/// Calculates the refraction according Snellius Law Returns None when we're at the 'critical'
+/// angle, that causes full internal reflection.
+/// GLSL equiv: use https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/refract.xhtml
+/// However in GLSL returns 0.0 in critical angle
+fn refract(
+    direction: Vector3<f32>,
+    normal: Vector3<f32>,
+    eta: f32,
+) -> Option<Vector3<f32>> {
+    let cos_phi_1 = direction.dot(normal);
+    let k = 1.0 - eta * eta * (1.0 - cos_phi_1);
+    if k < 0.0 {
+        None
+    } else {
+        Some((eta * direction) - (eta * cos_phi_1 + k.sqrt()) * normal)
+    }
+}
+
+/// Calculates the reflection vector
 fn reflect(direction: Vector3<f32>, normal: Vector3<f32>) -> Vector3<f32> {
     (direction - 2. * direction.dot(normal) * normal)
 }
 
+/// Approximates the Frensel equations for a dielectric-conductor interface
+/// Borrowed from : https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+///
+///
+/// Approximates the Frensel equations for two dielectrics interfacing
 fn schlick(direction: Vector3<f32>, normal: Vector3<f32>, n1: f32, n2: f32) -> f32 {
     let i = (n1 - n2) / (n1 + n2);
     let r0 = i * i;
@@ -81,23 +104,32 @@ fn schlick(direction: Vector3<f32>, normal: Vector3<f32>, n1: f32, n2: f32) -> f
 fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
     let mut ray = ray.clone();
     let mut a = 1.0;
-    let mut color = Vector3::new(0.0,0.0,0.0);
+    let mut accum = Vector3::new(0.0, 0.0, 0.0);
     for _ in 0..depth {
         match nearest_intersection(scene, ray) {
             None => {
                 break;
-            },
+            }
             Some(i) => {
-                let s = i.material.spec;
-                let d = 1.0 - s;
-                color += a*d*direct_illumination(scene, i);
-                a *= s;
-                ray = Ray {
-                    origin: i.intersection,
-                    direction: reflect(ray.direction, i.normal),
+                match i.material {
+                    Material::Conductor{spec, color} => {
+                        let r = reflect(ray.direction, i.normal);
+                        let s = spec;
+                        let d = 1.0 - s;
+                        accum += a * d * direct_illumination(&scene, i.intersection, i.normal, color);
+                        a *= s;
+                        // TODO break if not specular
+                        ray = Ray {
+                            origin: i.intersection,
+                            direction: reflect(ray.direction, i.normal),
+                        }
+                    },
+                    Material::Dielectric{absorb, n1, n2} => {
+                    },
                 }
-            },
+                // TODO reword specularity in terms of the Frensel equations, also for Lambertians
+            }
         }
     }
-    color
+    accum
 }
