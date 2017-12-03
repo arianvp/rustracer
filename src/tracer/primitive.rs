@@ -12,7 +12,7 @@ pub enum Material {
         spec: f32,
     },
     Dielectric {
-        absorb: Vector3<f32>,
+        color: Vector3<f32>,
         n1: f32,  // TODO: we should just have 1 n, and keep track in the tracer what the transitions are
         n2: f32,
 
@@ -83,7 +83,7 @@ impl Primitive {
                 radius,
                 material,
             } => {
-                let distance = position - ray.origin;
+                /*let distance = position - ray.origin;
                 let tca = distance.dot(ray.direction);
                 if tca < 0.0 {
                     return None;
@@ -112,13 +112,35 @@ impl Primitive {
                 let distance = t0;
                 let intersection = ray.origin + ray.direction * t0;
                 let normal = (intersection - position).normalize();
+                let normal = if inside { -normal} else { normal };*/
+
+                let m = ray.origin - position;
+                let b = m.dot(ray.direction);
+                let c = m.dot(m) - (radius * radius);
+                if c > 0.0 && b > 0.0 {
+                    return None
+                }
+                let d = b * b - c;
+                if d < 0.0 {
+                    return None
+                }
+                let mut normal_mult = 1.0;
+                let mut t = -b - d.sqrt();
+                if t < 0.0 {
+                    t = -b + d.sqrt();
+                    normal_mult = -1.0;
+                }
+                let intersection = ray.origin + ray.direction*t;
+                let normal = (intersection - position).normalize() * normal_mult;
+
+
                 Some(Intersection {
                     material,
                     normal,
-                    inside,
+                    inside: false,
                     // NOTE: I added a little bit of Bias, or we would reintersect the ball
                     intersection: intersection + normal * 1e-4,
-                    distance,
+                    distance: t,
                 })
             }
         }

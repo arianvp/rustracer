@@ -18,6 +18,10 @@ impl Scene {
                     intensity: 9.0,
                     position: Point3::new(7.0, 8.0, 0.0),
                 },
+                Light {
+                    intensity: 0.3,
+                    position: Point3::new(0.0, 1.0, 0.0),
+                },
             ],
             primitives: vec![
                 Primitive::Plane{
@@ -31,7 +35,7 @@ impl Scene {
                     radius: 0.5,
                 },
                 Primitive::Sphere {
-                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.0, 0.0, 1.0) },
+                    material: Material::Dielectric{ n1: 1.125, n2: 1.0, color: Vector3::new(0.0, 0.0, 1.0) },
                     position: Point3::new(1.0, 1.0, 0.0),
                     radius: 0.3,
                 },

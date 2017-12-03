@@ -76,12 +76,13 @@ fn refract(
     normal: Vector3<f32>,
     eta: f32,
 ) -> Option<Vector3<f32>> {
-    let cos_phi_1 = direction.dot(normal);
-    let k = 1.0 - eta * eta * (1.0 - cos_phi_1);
+    let cos_phi_1 = normal.dot(direction);
+    let k = 1.0 - eta * eta * (1.0 - cos_phi_1 * cos_phi_1);
     if k < 0.0 {
         None
     } else {
-        Some((eta * direction) - (eta * cos_phi_1 + k.sqrt()) * normal)
+        let r = (eta * direction) - (eta * cos_phi_1 + k.sqrt()) * normal;
+        Some(r)
     }
 }
 
@@ -105,7 +106,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
     let mut ray = ray.clone();
     let mut a = 1.0;
     let mut accum = Vector3::new(0.0, 0.0, 0.0);
-    for _ in 0..depth {
+    for j in 0..depth {
         match nearest_intersection(scene, ray) {
             None => {
                 break;
@@ -118,13 +119,27 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                         let d = 1.0 - s;
                         accum += a * d * direct_illumination(&scene, i.intersection, i.normal, color);
                         a *= s;
+                        let r = reflect(ray.direction, i.normal);
                         // TODO break if not specular
                         ray = Ray {
-                            origin: i.intersection,
-                            direction: reflect(ray.direction, i.normal),
+                            origin: i.intersection + r*0.001,
+                            direction: r,
                         }
                     },
-                    Material::Dielectric{absorb, n1, n2} => {
+                    Material::Dielectric{color, n1, n2} => {
+                        let mut reflect_ = schlick(ray.direction, i.normal, n1, n2);
+                        let refract_ = 1.0 - reflect_;
+
+                        // Now we need to send two rays. But my framework does not support this. So
+                        // recursion
+                        if let Some(r) = refract(ray.direction, i.normal, 1.0 / 1.125) {
+                            a *= refract_;
+                            ray = Ray{origin:i.intersection + r*0.001, direction: r}
+                        } else {
+                            reflect_ = 1.0;
+                        }
+                        let r = reflect(ray.direction, i.normal);
+                        accum += reflect_ * trace(&scene, Ray{origin:i.intersection + r*0.001, direction:r}, depth - j - 1);
                     },
                 }
                 // TODO reword specularity in terms of the Frensel equations, also for Lambertians
