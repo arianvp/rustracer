@@ -103,53 +103,52 @@ fn schlick(direction: Vector3<f32>, normal: Vector3<f32>, r0: f32) -> f32 {
 const bias: f32 = 0.001;
 
 fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
-    let mut ray = ray.clone();
     let mut a = 1.0;
     let mut b = 1.0;
     let mut accum = Vector3::new(0.0, 0.0, 0.0);
-    for j in 0..depth {
-        match nearest_intersection(scene, ray) {
-            None => {
-                break;
-            }
-            Some(i) => {
-                let outside = ray.direction.dot(i.normal) < 0.0;
-                let biasn = bias * i.normal;
-                match i.material {
-                    Material::Conductor{spec, color} => {
-                        let r = reflect(ray.direction, i.normal);
-                        let s = spec; // schlick(ray.direction, i.normal, spec);
-                        let d = 1.0 - s;
-                        accum += a * d * direct_illumination(&scene, i.intersection, i.normal, color);
-                        a *= s;
-                        let r = reflect(ray.direction, i.normal);
-                        // TODO break if not specular
-                        ray = Ray {
-                            origin: i.intersection + if outside { biasn } else { -biasn },
-                            direction: r,
-                        }
-                    },
-                    Material::Dielectric{color, n1, n2} => {
-                        let mut reflect_ = schlick(ray.direction, i.normal, ((n1-n2) / (n1+n2)).powi(2));
-                        let refract_ = 1.0 - reflect_;
+    if depth == 0 {
+        return accum;
+    }
+    match nearest_intersection(scene, ray) {
+        None => {
+            Vector3::new(0.0, 0.0, 0.0)
+        }
+        Some(i) => {
+            let outside = ray.direction.dot(i.normal) < 0.0;
+            let biasn = bias * i.normal;
+            match i.material {
+                Material::Conductor{spec, color} => {
+                    let r = reflect(ray.direction, i.normal);
+                    let s = spec; // schlick(ray.direction, i.normal, spec);
+                    let d = 1.0 - s;
 
-                        let r = reflect(ray.direction, i.normal);
-                        accum += b * reflect_ * trace(&scene, Ray{origin: i.intersection + if outside {biasn} else {-biasn}, direction:r}, depth - j - 1);
+                    let refraction =  d * direct_illumination(&scene, i.intersection, i.normal, color);
+                    let r = reflect(ray.direction, i.normal);
+                    // TODO break if not specular
+                    let ray = Ray {
+                        origin: i.intersection + if outside { biasn } else { -biasn },
+                        direction: r,
+                    };
+                    let reflection = s * trace(scene, ray, depth - 1);
+                    reflection + refraction
+                },
+                Material::Dielectric{color, n1, n2} => {
+                    let mut reflect_ = schlick(ray.direction, i.normal, ((n1-n2) / (n1+n2)).powi(2));
+                    let refract_ = 1.0 - reflect_;
+                    // Now we need to send two rays. But my framework does not support this. So
+                    // recursion
+                    let refraction = if let Some(r) = refract(ray.direction, i.normal, n1 / n2) {
+                        let ray = Ray{origin: i.intersection + if outside {-biasn} else {biasn}, direction: r};
+                        refract_ * trace(scene, ray, depth - 1)
 
-                        // Now we need to send two rays. But my framework does not support this. So
-                        // recursion
-                        if let Some(r) = refract(ray.direction, i.normal, if outside { 1.0 / 1.125} else { 1.125 / 1.0 }) {
-                            b *= refract_;
-                            ray = Ray{origin: i.intersection + if outside {-biasn} else {biasn}, direction: r}
-                        } else {
-                            reflect_ = 1.0;
-                        }
-
-                    },
-                }
-                // TODO reword specularity in terms of the Frensel equations, also for Lambertians
+                    } else {
+                        reflect_ = 1.0;
+                        Vector3::new(0.0,0.0,0.0)
+                    };
+                    let r = reflect(ray.direction, i.normal);
+                    refraction + reflect_ * trace(&scene, Ray{origin: i.intersection + if outside {biasn} else {-biasn}, direction:r}, depth - 1)
+                },
             }
         }
     }
-    accum
 }

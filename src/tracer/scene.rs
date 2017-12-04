@@ -30,7 +30,7 @@ impl Scene {
                     material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.0, 1.0, 0.0) },
                 },
                 Primitive::Sphere {
-                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(1.0, 0.0, 0.0) },
+                    material: Material::Conductor{ spec: 0.3, color: Vector3::new(1.0, 0.0, 0.0) },
                     position: Point3::new(0.0, 1.0, 0.0),
                     radius: 0.5,
                 },
