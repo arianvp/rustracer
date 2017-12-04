@@ -132,7 +132,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     let reflection = s * trace(scene, ray, depth - 1);
                     reflection + refraction
                 },
-                Material::Dielectric{color, n1, n2} => {
+                Material::Dielectric{absorbance, n1, n2} => {
                     let mut reflect_ = schlick(ray.direction, i.normal, ((n1-n2) / (n1+n2)).powi(2));
                     let refract_ = 1.0 - reflect_;
                     // Now we need to send two rays. But my framework does not support this. So
@@ -140,7 +140,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     let refraction = if let Some(r) = refract(ray.direction, i.normal, n1 / n2) {
                         let ray = Ray{origin: i.intersection + if outside {-biasn} else {biasn}, direction: r};
                         let dist = nearest_intersection(scene, ray).map(|x|x.distance).unwrap_or(0.);
-                        let absorbance = color * 0.9 * -dist;
+                        let absorbance = absorbance * -dist;
                         let transparency = Vector3::new(absorbance.x.exp(), absorbance.y.exp(), absorbance.z.exp());
                         transparency.mul_element_wise(refract_ * trace(scene, ray, depth - 1))
 

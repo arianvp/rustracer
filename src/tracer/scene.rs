@@ -40,7 +40,7 @@ impl Scene {
                     radius: 0.5,
                 },
                 Primitive::Sphere {
-                    material: Material::Dielectric{ n1: 1.0, n2: 1.125, color: Vector3::new(0.0, 1.0, 1.0) },
+                    material: Material::Dielectric{ n1: 1.0, n2: 1.125, absorbance: Vector3::new(1.0, 1.3, 1.0) },
                     position: Point3::new(5.0, 1.0, 0.0),
                     radius: 1.0,
                 },
