@@ -3,7 +3,7 @@ pub mod primitive;
 pub mod ray;
 pub mod scene;
 
-use cgmath::{EuclideanSpace, InnerSpace, Array};
+use cgmath::{EuclideanSpace, InnerSpace, Array, ElementWise};
 use cgmath::{Vector3, Point3};
 use std::f32;
 use std::cmp::Ordering;
@@ -111,7 +111,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
     }
     match nearest_intersection(scene, ray) {
         None => {
-            Vector3::new(0.0, 0.0, 0.0)
+            Vector3::new(0.5, 0.5, 1.0)
         }
         Some(i) => {
             let outside = ray.direction.dot(i.normal) < 0.0;
@@ -139,7 +139,10 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     // recursion
                     let refraction = if let Some(r) = refract(ray.direction, i.normal, n1 / n2) {
                         let ray = Ray{origin: i.intersection + if outside {-biasn} else {biasn}, direction: r};
-                        refract_ * trace(scene, ray, depth - 1)
+                        let dist = nearest_intersection(scene, ray).map(|x|x.distance).unwrap_or(0.);
+                        let absorbance = color * 0.9 * -dist;
+                        let transparency = Vector3::new(absorbance.x.exp(), absorbance.y.exp(), absorbance.z.exp());
+                        transparency.mul_element_wise(refract_ * trace(scene, ray, depth - 1))
 
                     } else {
                         reflect_ = 1.0;
