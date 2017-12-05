@@ -7,59 +7,40 @@ extern crate vulkano_win;
 extern crate winit;
 extern crate image;
 extern crate cgmath;
+extern crate scoped_threadpool;
 
 extern crate simd;
 extern crate half;
-extern crate obj;
+extern crate tobj;
 
 mod shaders;
 mod tracer;
 mod vec;
 
-use tracer::camera::Camera;
-use tracer::scene::Scene;
-
-use std::time::{Duration, Instant};
+use scoped_threadpool::Pool;
 use std::mem;
 use std::sync::Arc;
-use vulkano::sync;
-use vulkano::buffer::BufferUsage;
+use std::time::Instant;
+use tracer::camera::Camera;
+use tracer::scene::Scene;
+use vulkano::buffer::{CpuBufferPool, BufferUsage};
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
-use vulkano::buffer::CpuBufferPool;
-use vulkano::command_buffer::AutoCommandBufferBuilder;
-use vulkano::command_buffer::DynamicState;
+use vulkano::command_buffer::{AutoCommandBufferBuilder, DynamicState};
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
-use vulkano::device::Device;
-use vulkano::device::DeviceExtensions;
-use vulkano::device::Queue;
+use vulkano::device::{Device, DeviceExtensions, Queue};
 use vulkano::format::Format;
-use vulkano::framebuffer::Framebuffer;
-use vulkano::framebuffer::Subpass;
-use vulkano::image::Dimensions;
-use vulkano::image::StorageImage;
-use vulkano::instance::Instance;
-use vulkano::instance::PhysicalDevice;
+use vulkano::framebuffer::{Framebuffer, Subpass};
+use vulkano::image::{Dimensions, StorageImage};
+use vulkano::instance::{Instance, PhysicalDevice};
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::viewport::Viewport;
-use vulkano::sampler::Filter;
-use vulkano::sampler::MipmapMode;
-use vulkano::sampler::Sampler;
-use vulkano::sampler::SamplerAddressMode;
+use vulkano::sampler::{Filter, MipmapMode, Sampler, SamplerAddressMode};
 use vulkano::swapchain;
-use vulkano::swapchain::AcquireError;
-use vulkano::swapchain::CompositeAlpha;
-use vulkano::swapchain::SurfaceTransform;
-use vulkano::swapchain::Swapchain;
-use vulkano::swapchain::SwapchainCreationError;
+use vulkano::swapchain::{AcquireError, CompositeAlpha, SurfaceTransform, Swapchain, SwapchainCreationError};
+use vulkano::sync;
 use vulkano::sync::GpuFuture;
-use vulkano_win::VkSurfaceBuild;
-use vulkano_win::Window;
-use winit::Event;
-use winit::EventsLoop;
-use winit::WindowBuilder;
-use winit::WindowEvent;
-
-
+use vulkano_win::{VkSurfaceBuild, Window};
+use winit::{Event, EventsLoop, WindowBuilder, WindowEvent};
 
 
 fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
@@ -253,12 +234,14 @@ fn main() {
     let scene = Scene::new();
     let mut camera = Camera::new(WIDTH, HEIGHT);
 
+    // TODO number of threads
+    let mut pool = Pool::new(4);
 
     loop {
         let begin_time = Instant::now();
         previous_frame_end.cleanup_finished();
 
-        tracer::tracer(&camera, &scene, &mut white_buffer);
+        tracer::tracer(&camera, &scene, & mut pool, &mut white_buffer);
 
 
         let dynamic_state = DynamicState {

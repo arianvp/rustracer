@@ -12,7 +12,8 @@ image = "*"
 cgmath = "*"
 simd = "*"
 half = "*"
-obj = "*"
+tobj = "*"
+scoped_threadpool = "*"
 
 [profile.release]
 debug = true

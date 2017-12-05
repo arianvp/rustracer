@@ -2,31 +2,42 @@ pub mod camera;
 pub mod primitive;
 pub mod ray;
 pub mod scene;
+pub mod mesh;
 
-use cgmath::{EuclideanSpace, InnerSpace, Array, ElementWise};
+use cgmath::{InnerSpace, ElementWise};
 use cgmath::{Vector3, Point3};
 use std::f32;
-use std::cmp::Ordering;
+
+use scoped_threadpool::Pool;
 
 
 use half::f16;
 use self::scene::Scene;
 use self::ray::Ray;
 use self::camera::Camera;
-use self::primitive::{Light, Primitive, Material, Intersection, Sphere, Plane};
+use self::primitive::{Light, Material};
 
 
-pub fn tracer(camera: &Camera, scene: &Scene, buffer: &mut Vec<[f16; 4]>) {
-    for y in 0..camera.width {
-        for x in 0..camera.height {
-            let color = trace(scene, camera.generate(x, y), 5);
-            let idx = x + y * camera.height;
-            for i in 0..3 {
-                buffer[idx][i] = f16::from_f32(color[i]);
-            }
-
+pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, buffer: &mut Vec<[f16; 4]>) {
+    let n = pool.thread_count() as usize;
+    // NOTE: this multi-threading is taken from my previous tracer on which I worked together on
+    // with with Renier Maas, who did the course last year. 
+    pool.scoped(|scope|{
+        for (task_num, mut chunk) in buffer.chunks_mut(camera.width*camera.height / n).enumerate() {
+            scope.execute(move||{
+                let start_y = task_num * (camera.height / n);
+                for y in 0.. camera.height / n {
+                    for x in 0..camera.width {
+                        let color = trace(scene, camera.generate(x,y + start_y), 12);
+                        let idx = x + y * camera.width;
+                        for i in 0..3 {
+                            chunk[idx][i] = f16::from_f32(color[i]);
+                        }
+                    }
+                }
+            })
         }
-    }
+    })
 
 }
 
@@ -44,7 +55,7 @@ fn direct_illumination(scene: &Scene, intersection: Point3<f32>, normal: Vector3
         |accum, light| {
             let origin = intersection;
             let direction = (light.position - intersection).normalize();
-            let ray = Ray { origin: origin + normal * bias, direction };
+            let ray = Ray { origin: origin + normal * BIAS, direction };
             let to_mul = if scene.nearest_intersection(ray).is_some() {
                 Vector3::new(0.0, 0.0, 0.0)
             } else {
@@ -89,14 +100,22 @@ fn schlick(direction: Vector3<f32>, normal: Vector3<f32>, r0: f32) -> f32 {
     r0 + (1.0 - r0) * (1.0 - -direction.dot(normal)).powi(5)
 }
 
-const bias: f32 = 0.001;
+fn fresnel_conductor(direction: Vector3<f32>, normal: Vector3<f32>, eta: f32, k: f32) -> f32 {
+    let cos_i = direction.dot(normal);
+    let a = (eta * eta + k * k) + cos_i * cos_i;
+    let col = 1.0;
+    let r_par = (a - eta * cos_i * 2.0 + col) / (a + eta * cos_i * 2.0 + col);
+    let b = eta * eta + k * k;
+    let col = cos_i * cos_i;
+    let r_perp = (b - eta * cos_i * 2.0 + col) / (b + eta * cos_i * 2.0 + col);
+    (r_par + r_perp) * 0.5
+}
+
+const BIAS: f32 = 0.001;
 
 fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
-    let mut a = 1.0;
-    let mut b = 1.0;
-    let mut accum = Vector3::new(0.0, 0.0, 0.0);
     if depth == 0 {
-        return accum;
+        return Vector3::new(0.0, 0.0, 0.0);
     }
     match scene.nearest_intersection(ray) {
         None => {
@@ -104,10 +123,9 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
         }
         Some(i) => {
             let outside = ray.direction.dot(i.normal) < 0.0;
-            let biasn = bias * i.normal;
+            let biasn = BIAS * i.normal;
             match i.material {
                 Material::Conductor{spec, color} => {
-                    let r = reflect(ray.direction, i.normal);
                     let s = spec; // schlick(ray.direction, i.normal, spec);
                     let d = 1.0 - s;
 
@@ -126,7 +144,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     let refract_ = 1.0 - reflect_;
                     // Now we need to send two rays. But my framework does not support this. So
                     // recursion
-                    let refraction = if let Some(r) = refract(ray.direction, i.normal, if outside { n1 / n2 } else { n2 / n1 }) {
+                    let refraction = if let Some(r) = refract(ray.direction, i.normal, n1 / n2) {
                         let ray = Ray{origin: i.intersection + if outside {-biasn} else {biasn}, direction: r};
                         let dist = scene.nearest_intersection(ray).map(|x|x.distance).unwrap_or(0.);
                         let absorbance = absorbance * -dist;

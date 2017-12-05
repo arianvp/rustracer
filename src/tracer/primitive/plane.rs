@@ -1,0 +1,36 @@
+use cgmath::{Vector3, Point3};
+use cgmath::InnerSpace;
+use tracer::ray::Ray;
+use std::f32;
+use tracer::primitive::{Material, Intersection, Primitive};
+
+#[derive(Debug, Copy, Clone)]
+pub struct Plane {
+    pub p0: Point3<f32>,
+    pub material: Material,
+    pub normal: Vector3<f32>,
+}
+
+impl Primitive for Plane {
+    fn intersect(&self, ray: Ray) -> Option<Intersection> {
+        // TODO: not sure why I take the negative here. but it works?
+        let denom = -self.normal.dot(ray.direction);
+        if denom > 1e-5 {
+            let p0l0 = self.p0 - ray.origin;
+            let distance = -p0l0.dot(self.normal) / denom;
+            if distance >= 0.0 {
+                Some(Intersection {
+                    material: self.material,
+                    normal: self.normal,
+                    distance,
+                    intersection: ray.origin + (distance * ray.direction),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+

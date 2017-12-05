@@ -1,6 +1,5 @@
-use cgmath::{Vector3, Point3, Array};
+use cgmath::{Vector3, Point3};
 use cgmath::InnerSpace;
-use cgmath::ElementWise;
 use winit::VirtualKeyCode;
 use super::ray::Ray;
 use std::f32;
@@ -75,14 +74,14 @@ impl Camera {
     pub fn handle_input(&mut self, keycode: VirtualKeyCode) {
         match keycode {
             VirtualKeyCode::W => {
-                self.origin += (0.1 * self.direction);
+                self.origin += 0.1 * self.direction;
             },
             VirtualKeyCode::A => {
                 self.origin = self.origin + (-0.1 * self.right);
                 self.target = self.target + (-0.1 * self.right);
             },
             VirtualKeyCode::S => {
-                self.origin += (-0.1 * self.direction);
+                self.origin += -0.1 * self.direction;
             },
             VirtualKeyCode::D => {
                 self.origin = self.origin + (0.1 * self.right);

@@ -1,13 +1,21 @@
-use cgmath::{Vector3, Point3};
-use super::primitive::{Light, Primitive, Material, Sphere, Plane, Intersection};
+use cgmath::{Vector3, Point3, Array};
+use super::primitive::{Light, Primitive, Material, Intersection};
+use super::primitive::plane::Plane;
+use super::primitive::sphere::Sphere;
+use super::primitive::triangle::Triangle;
 use super::ray::{Ray};
 use std::cmp::Ordering;
+use super::mesh::Mesh;
+
+use std::path::Path;
 
 pub struct Scene {
     pub lights: Vec<Light>,
     pub planes: Vec<Plane>,
     pub spheres: Vec<Sphere>,
+    pub triangles: Vec<Triangle>,
 }
+
 
 fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: Ray) -> Option<Intersection> {
     primitives.iter().filter_map(|p| p.intersect(ray)).min_by(
@@ -22,19 +30,21 @@ fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: Ray) -> Option<Int
 
 impl Scene {
     pub fn new() -> Scene {
+        let mesh = Mesh::load_from_path(&Path::new("./assets/cube.obj"), Vector3::new(-4.0, 1.0, 1.0), 0.5).expect("Error loading");
         Scene {
+            triangles: mesh.triangles, /*vec![
+                Triangle{
+                    p0: Point3::new(0.0, -1.0, 0.0),
+                    p1: Point3::new(0.25, -1.0, 0.0),
+                    p2: Point3::new(0.0, -1.0, 0.25),
+                    normal: Vector3::new(0.0, 1.0, 0.0),
+                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.0, 1.0, 0.0) },
+                },
+            ],*/
             lights: vec![
                 Light {
-                    intensity: 1.0,
-                    position: Point3::new(0.0, 3.0, 0.0),
-                },
-                Light {
                     intensity: 9.0,
-                    position: Point3::new(7.0, 8.0, 0.0),
-                },
-                Light {
-                    intensity: 0.3,
-                    position: Point3::new(0.0, 1.0, 0.0),
+                    position: Point3::new(1.0, 3.0, 4.0),
                 },
             ],
             planes: vec![
@@ -68,12 +78,17 @@ impl Scene {
         // we iterate over each of the primitives together for more cache coherence
         let plane = nearest_intersection_(&self.planes, ray);
         let sphere = nearest_intersection_(&self.spheres, ray);
+        let triangle = nearest_intersection_(&self.triangles, ray);
 
-        match (plane, sphere) {
-            (Some(plane), Some(sphere)) => if plane.distance < sphere.distance { Some(plane) } else { Some(sphere) },
-            (Some(plane), None) => Some(plane),
-            (None, Some(sphere)) => Some(sphere),
-            (None, None) => None,
+        let mut nearest = None;
+        for y in [plane, sphere, triangle].iter() {
+            if let &Some(i) = y {
+                let  r:  &mut Intersection = nearest.get_or_insert(i);
+                if i.distance < r.distance {
+                    *r = i
+                }
+            }
         }
+        nearest
     }
 }
