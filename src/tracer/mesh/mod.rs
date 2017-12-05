@@ -24,8 +24,8 @@ impl Mesh {
                 .chunks(3)
                 .map(|indices| {
                     Triangle {
-                        //material: Material::Dielectric{ n1: 1.0, n2: 1.51, absorbance: Vector3::new(0.0, 0.0, 0.0) },
-                        material: Material::Conductor{spec:0.0, color:Vector3::new(1.0,0.0,0.0)} ,
+                        material: Material::Dielectric{ n1: 1.0, n2: 1.21, absorbance: Vector3::new(0.0, 0.0, 0.0) },
+                        //material: Material::Conductor{spec:1.0, color:Vector3::new(1.0,0.0,0.0)} ,
                         p0: (positions[indices[0] as usize] * scale) + translation,
                         p1: (positions[indices[1] as usize] * scale) + translation,
                         p2: (positions[indices[2] as usize] * scale) + translation,

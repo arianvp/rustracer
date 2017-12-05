@@ -59,7 +59,7 @@ impl Primitive for Sphere {
             normal_mult = -1.0;
         }
         let intersection = ray.origin + ray.direction*t;
-        let normal = (intersection - self.position).normalize() * normal_mult;
+        let normal = (intersection - self.position).normalize(); // * normal_mult;
 
 
         Some(Intersection {

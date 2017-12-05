@@ -28,7 +28,7 @@ pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, buffer: &mut Vec<
                 let start_y = task_num * (camera.height / n);
                 for y in 0.. camera.height / n {
                     for x in 0..camera.width {
-                        let color = trace(scene, camera.generate(x,y + start_y), 12);
+                        let color = trace(scene, camera.generate(x,y + start_y), 8);
                         let idx = x + y * camera.width;
                         for i in 0..3 {
                             chunk[idx][i] = f16::from_f32(color[i]);
@@ -76,12 +76,12 @@ fn refract(
     normal: Vector3<f32>,
     eta: f32,
 ) -> Option<Vector3<f32>> {
-    let cos_phi_1 = normal.dot(direction);
+    let cos_phi_1 = -(normal.dot(direction));
     let k = 1.0 - eta * eta * (1.0 - cos_phi_1 * cos_phi_1);
     if k < 0.0 {
         None
     } else {
-        let r = (eta * direction) - (eta * cos_phi_1 + k.sqrt()) * normal;
+        let r = (eta * direction) + normal  * (eta * cos_phi_1 - k.sqrt());
         Some(r)
     }
 }
@@ -113,6 +113,8 @@ fn fresnel_conductor(direction: Vector3<f32>, normal: Vector3<f32>, eta: f32, k:
 
 const BIAS: f32 = 0.001;
 
+
+
 fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
     if depth == 0 {
         return Vector3::new(0.0, 0.0, 0.0);
@@ -141,7 +143,8 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                 },
                 Material::Dielectric{absorbance, n1, n2} => {
                     let mut reflect_ = schlick(ray.direction, i.normal, ((n2-n1) / (n1+n2)).powi(2));
-                    let refract_ = 1.0 - reflect_;
+                    //let mut reflect_ = 0.0;
+                    let refract_ = 1.0; // - reflect_;
                     // Now we need to send two rays. But my framework does not support this. So
                     // recursion
                     let refraction = if let Some(r) = refract(ray.direction, i.normal, n1 / n2) {

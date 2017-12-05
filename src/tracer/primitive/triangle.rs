@@ -17,12 +17,11 @@ impl Primitive for Triangle {
     fn intersect(&self, ray: Ray) -> Option<Intersection> {
         let e1 = self.p1 - self.p0;
         let e2 = self.p2 - self.p0;
-        let normal = e1.cross(e2).normalize();
         let p = ray.direction.cross(e2);
         let det = e1.dot(p);
 
 
-        if (det > -f32::EPSILON && det < f32::EPSILON) {
+        if (det < f32::EPSILON) {
             return None
         }
 
@@ -41,7 +40,7 @@ impl Primitive for Triangle {
         let intersection = ray.origin + t * ray.direction;
             Some(Intersection {
                 intersection: intersection,
-                normal,
+                normal: self.normal,
                 material: self.material,
                 distance: t,
             })
