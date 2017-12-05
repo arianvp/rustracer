@@ -13,7 +13,7 @@ use half::f16;
 use self::scene::Scene;
 use self::ray::Ray;
 use self::camera::Camera;
-use self::primitive::{Light, Primitive, Material, Intersection};
+use self::primitive::{Light, Primitive, Material, Intersection, Sphere, Plane};
 
 
 pub fn tracer(camera: &Camera, scene: &Scene, buffer: &mut Vec<[f16; 4]>) {
@@ -30,17 +30,6 @@ pub fn tracer(camera: &Camera, scene: &Scene, buffer: &mut Vec<[f16; 4]>) {
 
 }
 
-fn nearest_intersection(scene: &Scene, ray: Ray) -> Option<Intersection> {
-    scene
-        .primitives
-        .iter()
-        .filter_map(|p| p.intersect(&ray))
-        .min_by(|a, b| {
-            a.distance.partial_cmp(&b.distance).unwrap_or(
-                Ordering::Equal,
-            )
-        })
-}
 pub fn brdf(intersection: Point3<f32>, normal: Vector3<f32>, light: &Light) -> f32 {
     let light_direction = light.position - intersection;
     let light_distance = light_direction.magnitude();
@@ -56,7 +45,7 @@ fn direct_illumination(scene: &Scene, intersection: Point3<f32>, normal: Vector3
             let origin = intersection;
             let direction = (light.position - intersection).normalize();
             let ray = Ray { origin: origin + normal * bias, direction };
-            let to_mul = if nearest_intersection(scene, ray).is_some() {
+            let to_mul = if scene.nearest_intersection(ray).is_some() {
                 Vector3::new(0.0, 0.0, 0.0)
             } else {
                 brdf(intersection, normal, light) * color
@@ -109,7 +98,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
     if depth == 0 {
         return accum;
     }
-    match nearest_intersection(scene, ray) {
+    match scene.nearest_intersection(ray) {
         None => {
             Vector3::new(0.5, 0.5, 1.0)
         }
@@ -133,13 +122,13 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     reflection + refraction
                 },
                 Material::Dielectric{absorbance, n1, n2} => {
-                    let mut reflect_ = schlick(ray.direction, i.normal, ((n1-n2) / (n1+n2)).powi(2));
+                    let mut reflect_ = schlick(ray.direction, i.normal, ((n2-n1) / (n1+n2)).powi(2));
                     let refract_ = 1.0 - reflect_;
                     // Now we need to send two rays. But my framework does not support this. So
                     // recursion
-                    let refraction = if let Some(r) = refract(ray.direction, i.normal, n1 / n2) {
+                    let refraction = if let Some(r) = refract(ray.direction, i.normal, if outside { n1 / n2 } else { n2 / n1 }) {
                         let ray = Ray{origin: i.intersection + if outside {-biasn} else {biasn}, direction: r};
-                        let dist = nearest_intersection(scene, ray).map(|x|x.distance).unwrap_or(0.);
+                        let dist = scene.nearest_intersection(ray).map(|x|x.distance).unwrap_or(0.);
                         let absorbance = absorbance * -dist;
                         let transparency = Vector3::new(absorbance.x.exp(), absorbance.y.exp(), absorbance.z.exp());
                         transparency.mul_element_wise(refract_ * trace(scene, ray, depth - 1))

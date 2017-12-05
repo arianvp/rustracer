@@ -10,6 +10,7 @@ extern crate cgmath;
 
 extern crate simd;
 extern crate half;
+extern crate obj;
 
 mod shaders;
 mod tracer;
