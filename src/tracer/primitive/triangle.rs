@@ -21,7 +21,7 @@ impl Primitive for Triangle {
         let det = e1.dot(p);
 
 
-        if (det < f32::EPSILON) {
+        if (det > -f32::EPSILON && det < f32::EPSILON) {
             return None
         }
 
@@ -34,7 +34,6 @@ impl Primitive for Triangle {
         if v < 0. || u + v > 1. { return None }
         let t = e2.dot(q) * inv_det;
 
-        //println!("normal: {:?}", normal);
 
         if t > f32::EPSILON {
         let intersection = ray.origin + t * ray.direction;

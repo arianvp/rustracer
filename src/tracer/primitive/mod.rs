@@ -35,5 +35,5 @@ pub struct Intersection {
 }
 
 pub trait Primitive {
-    fn intersect(&self, ray: Ray) -> Option<Intersection>;
+    fn intersect(&self, ray: Ray) ->  Option<Intersection>;
 }

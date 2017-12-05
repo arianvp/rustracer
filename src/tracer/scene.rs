@@ -3,7 +3,7 @@ use super::primitive::{Light, Primitive, Material, Intersection};
 use super::primitive::plane::Plane;
 use super::primitive::sphere::Sphere;
 use super::primitive::triangle::Triangle;
-use super::ray::{Ray};
+use super::ray::Ray;
 use std::cmp::Ordering;
 use super::mesh::Mesh;
 
@@ -30,43 +30,64 @@ fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: Ray) -> Option<Int
 
 impl Scene {
     pub fn new() -> Scene {
-        let mesh = Mesh::load_from_path(&Path::new("./assets/cube.obj"), Vector3::new(-4.0, 1.0, 1.0), 0.5).expect("Error loading");
+        let mesh1 = Mesh::load_from_path(
+            &Path::new("./assets/cube.obj"),
+            Vector3::new(-0.5, 1.0, 1.0),
+            0.5,
+            Material::Conductor {
+                spec: 0.0,
+                color: Vector3::new(0.0, 0.0, 1.0),
+            },
+        ).expect("Error loading");
+        let mesh2 = Mesh::load_from_path(
+            &Path::new("./assets/cube.obj"),
+            Vector3::new(0.5, 1.0, 1.0),
+            0.4,
+            Material::Dielectric {
+                n1: 1.0,
+                n2: 1.06,
+                absorbance: Vector3::new(0.0, 0.0, 0.0),
+            },
+        ).expect("Error loading");
+        let mut triangles = mesh1.triangles;
+        triangles.extend(mesh2.triangles);
         Scene {
-            triangles: mesh.triangles, /*vec![
-                Triangle{
-                    p0: Point3::new(0.0, -1.0, 0.0),
-                    p1: Point3::new(0.25, -1.0, 0.0),
-                    p2: Point3::new(0.0, -1.0, 0.25),
-                    normal: Vector3::new(0.0, 1.0, 0.0),
-                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.0, 1.0, 0.0) },
-                },
-            ],*/
+            triangles: triangles,
             lights: vec![
                 Light {
                     intensity: 9.0,
                     position: Point3::new(1.0, 3.0, 4.0),
                 },
+                Light {
+                    intensity: 5.0,
+                    position: Point3::new(1.0, 3.0, -4.0),
+                },
             ],
             planes: vec![
-                Plane{
+                Plane {
                     p0: Point3::new(0.0, 0.0, 0.0),
                     normal: Vector3::new(0.0, 1.0, 0.0),
-                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.0, 1.0, 0.0) },
+                    material: Material::Conductor {
+                        spec: 0.0,
+                        color: Vector3::new(0.0, 1.0, 0.0),
+                    },
                 },
             ],
             spheres: vec![
                 Sphere {
-                    material: Material::Conductor{ spec: 0.3, color: Vector3::new(1.0, 0.0, 0.0) },
+                    material: Material::Conductor {
+                        spec: 0.3,
+                        color: Vector3::new(1.0, 0.0, 0.0),
+                    },
                     position: Point3::new(0.0, 1.0, 0.0),
                     radius: 0.5,
                 },
                 Sphere {
-                    material: Material::Conductor{ spec: 0.0, color: Vector3::new(1.0, 0.0, 1.0) },
-                    position: Point3::new(-0.5, 1.0, 1.0),
-                    radius: 0.5,
-                },
-                Sphere {
-                    material: Material::Dielectric{ n1: 1.0, n2: 1.0, absorbance: Vector3::new(0.0, 0.0, 0.0) },
+                    material: Material::Dielectric {
+                        n1: 1.0,
+                        n2: 1.06,
+                        absorbance: Vector3::new(0.0, 0.0, 0.0),
+                    },
                     position: Point3::new(5.0, 1.0, 0.0),
                     radius: 1.0,
                 },
@@ -83,7 +104,7 @@ impl Scene {
         let mut nearest = None;
         for y in [plane, sphere, triangle].iter() {
             if let &Some(i) = y {
-                let  r:  &mut Intersection = nearest.get_or_insert(i);
+                let r: &mut Intersection = nearest.get_or_insert(i);
                 if i.distance < r.distance {
                     *r = i
                 }

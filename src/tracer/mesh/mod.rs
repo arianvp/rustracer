@@ -9,7 +9,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn from_tobj_to_mesh(mesh: &tobj::Mesh, translation: Vector3<f32>, scale: f32) -> Mesh {
+    pub fn from_tobj_to_mesh(mesh: &tobj::Mesh, translation: Vector3<f32>, scale: f32, material: Material) -> Mesh {
         let positions: Vec<Point3<f32>> = mesh.positions
             .chunks(3)
             .map(|i| Point3::new(i[0], i[1], i[2]))
@@ -24,7 +24,7 @@ impl Mesh {
                 .chunks(3)
                 .map(|indices| {
                     Triangle {
-                        material: Material::Dielectric{ n1: 1.0, n2: 1.21, absorbance: Vector3::new(0.0, 0.0, 0.0) },
+                        material,
                         //material: Material::Conductor{spec:1.0, color:Vector3::new(1.0,0.0,0.0)} ,
                         p0: (positions[indices[0] as usize] * scale) + translation,
                         p1: (positions[indices[1] as usize] * scale) + translation,
@@ -37,8 +37,8 @@ impl Mesh {
     }
 
     /// TODO I load simply one scene now
-    pub fn load_from_path(path: &Path, translation: Vector3<f32>, scale: f32) -> Result<Mesh, tobj::LoadError> {
+    pub fn load_from_path(path: &Path, translation: Vector3<f32>, scale: f32, material: Material) -> Result<Mesh, tobj::LoadError> {
         let (models, materials) = tobj::load_obj(path)?;
-        Ok(Mesh::from_tobj_to_mesh(&models[0].mesh, translation, scale))
+        Ok(Mesh::from_tobj_to_mesh(&models[0].mesh, translation, scale, material))
     }
 }

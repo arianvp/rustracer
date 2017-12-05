@@ -15,9 +15,10 @@ impl Primitive for Plane {
     fn intersect(&self, ray: Ray) -> Option<Intersection> {
         // TODO: not sure why I take the negative here. but it works?
         let denom = -self.normal.dot(ray.direction);
+        let lol = 1. / denom;
         if denom > 1e-5 {
             let p0l0 = self.p0 - ray.origin;
-            let distance = -p0l0.dot(self.normal) / denom;
+            let distance = -p0l0.dot(self.normal) * lol;
             if distance >= 0.0 {
                 Some(Intersection {
                     material: self.material,
