@@ -74,15 +74,16 @@ enabled, seconds per frame drops down to $0.7$ seconds at certain viewing angles
 Second of all, I have rewritten the triangle intersect code using SIMD intrinsics. (See \texttt{src/tracer/primitive/triangle.rs, src/vec/mod.rs})
 
 This
-brings down the average secons per frame to $1.02$ seconds, whilst the best case is still around $0.7$ seconds.
+brings down the average seconds per frame to $1.02$ seconds, whilst the best case is still around $0.7$ seconds.
 However, some small artifacts appear in the triangles. Either this is due to a bug, or due to the fact that
-the \emph{Reciprocal} instruction is only an approximation. I have not yet had time to debug this, and have thus
-reverted the code to use the old triangle intersection.
+the \emph{Reciprocal} instruction is only an approximation. I have not yet had time to debug this, but would be interesting to look at in asssignment two.
 
 A final profiling round shows that the handwritten SIMD code is now dominated by converting between
 SIMD \texttt{f32x4} and Rust's \texttt{Vector3}.  I use \texttt{Vector3} in all of the other code, so
 I only convert to \texttt{f32x4} when doing the triangle intersect. But apparently, this has quite some overhead.
 However, due to time constraints, I was not yet able to move fully to \texttt{f32x4} for all vector arithmetic so I will leave this as a promising next step for Assignment two.
+
+
 
 
 \subsection{Build instructions}
@@ -116,11 +117,13 @@ Tracer (As I implemented it there). It has all kinds of advanced movement, but
 also support for depth of field (if used in a path tracer), and changing the
 field of view.
 
-Multi-threading support is the same as in that PathTracer.
+Multi-threading is very similar as that previous path tracer. Chunks of memory are simply
+submitted to a threadpool using the \texttt{scoped\_threadpool} library.
 
-\url{https://www.scratchapixel.com/} is a \emph{great} resource for learning about computer graphics.
-I referenced it a lot to first refresh my knowledge from the bachelor graphics course on basic shading.
-But also for sphere intersections, and basic refractions.
+Finally I'd like to note that \url{https://www.scratchapixel.com/} is a
+\emph{great} resource for learning about computer graphics.  I referenced it a
+lot to first refresh my knowledge from the bachelor graphics course on basic
+shading.  But also for building sphere intersections, and basic refractions.
 
 Furthemore the following libraries have been used:
 \begin{itemize}
