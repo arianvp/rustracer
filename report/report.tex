@@ -1,11 +1,134 @@
 \documentclass{article}
+\usepackage{hyperref}
+\title{Assignment 1: Raytracing framework}
+\author{Arian van Putten - 4133935}
 \begin{document}
-\section{Build instructions}
-\section{Implemented features}
+\maketitle
 
-All the basic features have been implemented:
+\section{Implemented features}
+\subsection{Basic features}
+All basic features have been implemented.
+
+\subsection{Extra features}
+
+\subsubsection{Vulkan and Rust}
+I opted to implement my ray tracer in the Programming Language Rust. A modern replacement for C++.
+
+Rendering is performed by Vulkan. Vulkan is the successor of both OpenGL
+  and OpenCL. It gives very low level access to the GPU, both to the rasterizer
+    and to the compute pipeline.  Currently, the rasterizer is used to blit an
+    image on the screen.  During startup, the user can select between either
+    using the vulkan Compute pipeline to execute the raytracer, to to run the
+    raytracer on the CPU.
+
+    Vulkan drivers don't speak GLSL, but speak SPIR-V, a custom portable
+    bytecode for GPUs.  Shaders can be written in any language, and can then be
+    compiled to SPIR-V using LLVM and the Vulkan toolchain. In theory, this
+    means I could write my compute shaders in Rust, but I haven't gotten it
+    working yet.  So now I currently use GLSL-Compute.
+
+    GPU Ray tracing is not yet implemented, and for now simply renders a
+    Mandelbrot, to show that the Compute pipeline is working. I'm planning to
+    port the current CPU tracer to Vulkan Compute in exercise 3, and the
+    framework to do so is already there.
+
+    The most interesting feature of Vulkan is that there is no concept of a
+    rendering thread, and all operations are non-blocking and return so called
+    "futures" that allow us to asynchronously subscribe to when the GPU is done
+    with your command buffer.  This allows us to easily batch operations that
+    are sent to the GPU, but also do operations in parallel to the GPU with
+    ease without using a dedicated worker thread. I will use this in the future
+    to rebuild the BVH in parallel during rendering.
+
+
+\subsubsection{Realistic refraction}
+Realistic refraction has been implemented using Schlicks approximation of the Frensel equations
+and Beer's law for absorbance.:
+
+\subsubsection{Triangle meshes and OBJ loader}
+Triangle meshes are supported. I also support loading in triangle meshes from OBJ files.
+
+Currently, there are some limitations:
 \begin{itemize}
-\item Materials can be easily extended in \texttt{} 
+  \item Only one mesh per OBJ is supported, though the format ofifically supports multiple meshes per OBJ
+  \item Material properties are not loaded from the OBJ, but set globally per
+    mesh. However, changing this should not be too much work.
+  \item Normal interpolation is currently not yet performed for the triangles, but could be added easily
+  \item Texture mapping is not implemented
 \end{itemize}
+
+\subsubsection{Multiple light sources}
+Multiple light sources are supported. Though they are all point lights.
+
+\subsubsection{Multithreading}
+On the CPU, work is divided evenly over all cores. For this I use the \texttt{scoped\_threadpool} library.
+
+\subsubsection{Performance tuning}
+Using the \texttt{prof} sampling profiling tool, it was found that almost all time of the
+program (72 percent) was spent in the triangle intersection code, so I decided to tackle only only that code.
+
+First of all, we start with a classic high level optimisation. Early out. I enabled \emph{backface culling} for diffuse materials. This improves the performance a lot!
+Without it, most viewing angles give us a seconds per frame of around $1.60$ seconds.  But with back-face culling
+enabled, seconds per frame drops down to $0.7$ seconds at certain viewing angles.
+
+Second of all, I have rewritten the triangle intersect code using SIMD intrinsics. (See \texttt{src/tracer/primitive/triangle.rs, src/vec/mod.rs})
+
+This
+brings down the average secons per frame to $1.02$ seconds, whilst the best case is still around $0.7$ seconds.
+However, some small artifacts appear in the triangles. Either this is due to a bug, or due to the fact that
+the \emph{Reciprocal} instruction is only an approximation. I have not yet had time to debug this, and have thus
+reverted the code to use the old triangle intersection.
+
+A final profiling round shows that the handwritten SIMD code is now dominated by converting between
+SIMD \texttt{f32x4} and Rust's \texttt{Vector3}.  I use \texttt{Vector3} in all of the other code, so
+I only convert to \texttt{f32x4} when doing the triangle intersect. But apparently, this has quite some overhead.
+However, due to time constraints, I was not yet able to move fully to \texttt{f32x4} for all vector arithmetic so I will leave this as a promising next step for Assignment two.
+
+
+\subsection{Build instructions}
+So this is a bit complicated. I'm working with a lot of new technologies, so building this can be non-trivial.
+The following things are needed, at least:
+\begin{itemize}
+    \item A Driver that supports Vulkan.  Intel and NVIDIA have good support
+    \item Vulkan SDK
+    \item a GLSL to SPIR-V Compiler (glslValidator has one built in)
+    \item CMake
+    \item Rust nightly (The unstable version of rust) for SIMD instructions
+    \item Probably Linux (I have not tested this code on Windows at all. It probably doesn't build on Windows)
+\end{itemize}
+
+Finally, we build the binary but make sure to enable SIMD intrinsics \texttt{
+  RUSTFLAGS="-C target-cpu=native" cargo run --release}
+
+Once all these tools are installed,  a simple \texttt{cargo run --release} in the project directory should build
+all the dependencies and fire up the ray tracer.
+
+
+\section{Sources}
+As I already told Jacco Bikker, last year I worked together with Renier Maas on his path tracer that he built
+for Advanced Graphics. I worked  on parallelisation and safe multi-threading for the Conepts of Program Design course.
+Source code of that tracer can be found here: \url{https://github.com/arianvp/PathTracer}.
+
+The free camera is based off the free camera I have had lying around since
+Bachelor year two, which was then used in a GPU Path Tracer assignment in the
+Concurrency Course, and is almost the same as the one used in Reinier's Path
+Tracer (As I implemented it there). It has all kinds of advanced movement, but
+also support for depth of field (if used in a path tracer), and changing the
+field of view.
+
+Multi-threading support is the same as in that PathTracer.
+
+\url{https://www.scratchapixel.com/} is a \emph{great} resource for learning about computer graphics.
+I referenced it a lot to first refresh my knowledge from the bachelor graphics course on basic shading.
+But also for sphere intersections, and basic refractions.
+
+Furthemore the following libraries have been used:
+\begin{itemize}
+  \item \emph{tobj} A port of tinyobjectloader for Rust
+  \item \emph{vulkano} Vulkan API for rust
+  \item \emph{cgmath} Library implementing vector operations
+  \item \emph{scoped\_threadpool} Multi-threading library for rust
+\end{itemize}
+
 
 \end{document}

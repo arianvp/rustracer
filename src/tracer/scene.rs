@@ -17,6 +17,7 @@ pub struct Scene {
 }
 
 
+#[inline]
 fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: Ray) -> Option<Intersection> {
     primitives.iter().filter_map(|p| p.intersect(ray)).min_by(
         |a, b| {

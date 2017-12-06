@@ -12,6 +12,7 @@ extern crate cgmath;
 extern crate scoped_threadpool;
 
 extern crate simd;
+extern crate stdsimd;
 extern crate half;
 extern crate tobj;
 extern crate morton;
@@ -250,7 +251,7 @@ fn main() {
     let mut pool = Pool::new(4);
 
     // whether we use the GPU or the CPU tracer
-    let mut gpu = true;
+    let mut gpu = false;
 
     // Set up compute pipeline for the GPU tracer
 

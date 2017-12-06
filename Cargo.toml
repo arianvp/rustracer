@@ -15,6 +15,7 @@ half = "*"
 tobj = "*"
 scoped_threadpool = "*"
 morton = "*"
+stdsimd = "*"
 
 [profile.release]
 debug = true
