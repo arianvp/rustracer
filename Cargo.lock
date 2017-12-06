@@ -631,6 +631,7 @@ dependencies = [
  "half 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "morton 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "scoped_threadpool 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "simd 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdsimd 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",

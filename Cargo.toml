@@ -16,6 +16,7 @@ tobj = "*"
 scoped_threadpool = "*"
 morton = "*"
 stdsimd = "*"
+rand = "*"
 
 [profile.release]
 debug = true

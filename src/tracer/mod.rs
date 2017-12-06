@@ -9,6 +9,7 @@ use cgmath::{InnerSpace, ElementWise, Array};
 use cgmath::{Vector3, Point3};
 use std::f32;
 use std::mem;
+use rand::{random, Closed01};
 
 use scoped_threadpool::Pool;
 
@@ -62,19 +63,23 @@ fn direct_illumination(
     scene.lights.iter().fold(
         Vector3::new(0.0, 0.0, 0.0),
         |accum, light| {
-            let origin = intersection;
-            let direction = (light.position - intersection).normalize();
-            let ray = Ray {
-                origin: origin + normal * BIAS,
-                direction,
-            };
-            let to_mul = if scene.nearest_intersection(ray).is_some() {
-                Vector3::new(0.0, 0.0, 0.0)
-            } else {
-                brdf(intersection, normal, light) * color
-            };
 
-            accum + to_mul
+            let mut to_mul = 0.0;
+            for i in 0..4 {
+                let Closed01(off_x) = random::<Closed01<f32>>();
+                let Closed01(off_y) = random::<Closed01<f32>>();
+                let origin = intersection;
+                let direction = (light.position + Vector3::new(off_x / 10.0, off_y / 10.0, 0.0)  - intersection).normalize();
+                let ray = Ray {
+                    origin: origin + normal * BIAS,
+                    direction,
+                };
+                if !scene.nearest_intersection(ray).is_some() {
+                    to_mul += brdf(intersection, normal, light) / 4.0
+                }
+            }
+
+            accum + (to_mul * color)
         },
     )
 }
@@ -123,7 +128,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
             let biasn = BIAS * i.normal;
             match i.material {
                 Material::Conductor { spec, color } => {
-                    let s = schlick(ray.direction, i.normal, spec);
+                    let s = if spec == 0.0 { 0.0} else { schlick(ray.direction, i.normal, spec) };
                     let d = 1.0 - s;
                     let refraction = d *
                         direct_illumination(&scene, i.intersection, i.normal, color);
