@@ -27,7 +27,7 @@ struct Triangle2 {
 }
 
 // hand-rolled SIMD
-fn intersect(
+fn intersect_simd(
     p0: f32x4,
     p1: f32x4,
     p2: f32x4,
@@ -79,7 +79,7 @@ fn intersect(
 
 impl Primitive for Triangle {
     fn intersect(&self, ray: Ray) -> Option<Intersection> {
-        intersect(
+        /*intersect_simd(
             pnt_to_f32x4(self.p0),
             pnt_to_f32x4(self.p1),
             pnt_to_f32x4(self.p2),
@@ -87,8 +87,8 @@ impl Primitive for Triangle {
             vec_to_f32x4(ray.direction),
             self.normal,
             self.material,
-        )
-        /*
+        )*/
+        
         let e1 = self.p1 - self.p0;
         let e2 = self.p2 - self.p0;
         let p = ray.direction.cross(e2);
@@ -124,7 +124,7 @@ impl Primitive for Triangle {
             })
         } else {
             None
-        }*/
+        }
 
     }
 }
