@@ -121,21 +121,12 @@ impl Camera {
     }
 
 
-    /// generates a nice Ray (TODO better integer type)
     pub fn generate(&self, x: usize, y: usize) -> Ray {
-        // NOTE: we do not have to keep track of a
-        // pool of random number generators, each
-        // thread in rust has its own random
-        // number generator by default :)
-
-        // calculate sub-pixel ray target position on screen plane
-        // TODO simd this
         let u = ((x as f32)) / (self.width as f32);
         let v = ((y as f32)) / (self.height as f32);
         let target = self.p1 + u * (self.p2 - self.p1) + v * (self.p3 - self.p1);
         let origin = self.origin + self.lens_size * (self.right + self.up);
         let direction = (target - origin).normalize();
-
         Ray{origin, direction}
     }
 }

@@ -85,10 +85,10 @@ impl Scene {
                 Sphere {
                     material: Material::Dielectric {
                         n1: 1.0,
-                        n2: 1.06,
-                        absorbance: Vector3::new(0.9, 0.9, 0.2),
+                        n2: 1.21,
+                        absorbance: Vector3::new(0.7, 0.7, 0.2),
                     },
-                    position: Point3::new(5.0, 1.0, 0.0),
+                    position: Point3::new(3.0, 1.0, 0.0),
                     radius: 1.0,
                 },
             ],

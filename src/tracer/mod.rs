@@ -118,14 +118,13 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
         return Vector3::new(0.0, 0.0, 0.0);
     }
     match scene.nearest_intersection(ray) {
-        None => Vector3::new(0.5, 0.5, 1.0),
+        None => Vector3::new(0.1, 0.1, 1.0),
         Some(i) => {
             let biasn = BIAS * i.normal;
             match i.material {
                 Material::Conductor { spec, color } => {
                     let s = spec;
                     let d = 1.0 - s;
-
                     let refraction = d *
                         direct_illumination(&scene, i.intersection, i.normal, color);
                     let r = reflect(ray.direction, i.normal);
@@ -149,7 +148,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     let n1n2 = n1 / n2;
 
                     let mut refl_amount =
-                        schlick(ray.direction, norm_refrac, (n2 - n1) / (n1 + n2).powi(2));
+                        schlick(ray.direction, norm_refrac, ((n2 - n1) / (n1 + n2)).powi(2));
                     let refr_amount = 1.0 - refl_amount;
 
                     let refr = if let Some(dir) = refract(ray.direction, norm_refrac, n1n2) {

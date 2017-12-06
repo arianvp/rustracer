@@ -15,7 +15,6 @@ pub enum Material {
         absorbance: Vector3<f32>,
         n1: f32,  // TODO: we should just have 1 n, and keep track in the tracer what the transitions are
         n2: f32,
-
     }
 }
 

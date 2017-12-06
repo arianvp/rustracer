@@ -1,5 +1,5 @@
 #![feature(fused)]
-#![feature(exact_size_is_empty)] 
+#![feature(exact_size_is_empty)]
 
 #[macro_use]
 extern crate vulkano_shader_derive;
@@ -35,15 +35,16 @@ use vulkano::format::Format;
 use vulkano::framebuffer::{Framebuffer, Subpass};
 use vulkano::image::{Dimensions, StorageImage};
 use vulkano::instance::{Instance, PhysicalDevice};
-use vulkano::pipeline::GraphicsPipeline;
+use vulkano::pipeline::{GraphicsPipeline, ComputePipeline};
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::sampler::{Filter, MipmapMode, Sampler, SamplerAddressMode};
 use vulkano::swapchain;
-use vulkano::swapchain::{AcquireError, CompositeAlpha, SurfaceTransform, Swapchain, SwapchainCreationError};
+use vulkano::swapchain::{AcquireError, CompositeAlpha, SurfaceTransform, Swapchain,
+                         SwapchainCreationError};
 use vulkano::sync;
 use vulkano::sync::GpuFuture;
 use vulkano_win::{VkSurfaceBuild, Window};
-use winit::{Event, EventsLoop, WindowBuilder, WindowEvent};
+use winit::{Event, EventsLoop, WindowBuilder, WindowEvent, VirtualKeyCode};
 
 
 fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
@@ -231,7 +232,15 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Box::new(sync::now(Arc::clone(&device))) as Box<GpuFuture>;
 
-    let mut white_buffer: Vec<[half::f16; 4]> = vec![[half::f16::from_f32(0.0), half::f16::from_f32(0.0),half::f16::from_f32(0.0),half::f16::from_f32(0.0)]; WIDTH * HEIGHT];
+    let mut white_buffer: Vec<[half::f16; 4]> = vec![
+        [
+        half::f16::from_f32(0.0),
+        half::f16::from_f32(0.0),
+        half::f16::from_f32(0.0),
+        half::f16::from_f32(0.0),
+    ];
+        WIDTH * HEIGHT
+    ];
     let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
     let scene = Scene::new();
@@ -240,11 +249,49 @@ fn main() {
     // TODO number of threads
     let mut pool = Pool::new(4);
 
+    // whether we use the GPU or the CPU tracer
+    let mut gpu = true;
+
+    // Set up compute pipeline for the GPU tracer
+
+    use shaders::mandelbrot;
+    let cs = mandelbrot::cs::Shader::load(device.clone()).expect("failed to create shader module");
+    let compute_pipeline = Arc::new(
+        ComputePipeline::new(device.clone(), &cs.main_entry_point(), &())
+            .unwrap(),
+    );
+
+    let compute_params_buffer = CpuAccessibleBuffer::from_data(
+        device.clone(),
+        BufferUsage::all(),
+        mandelbrot::cs::ty::Input {
+            center: [1.0, 0.0],
+            iter: 200,
+            scale: 1.0,
+        },
+    ).unwrap();
+
+    let compute_set = Arc::new(
+        PersistentDescriptorSet::start(compute_pipeline.clone(), 0)
+            .add_image(image.clone())
+            .unwrap()
+            .add_buffer(compute_params_buffer)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+
+
+
+
     loop {
         let begin_time = Instant::now();
         previous_frame_end.cleanup_finished();
 
-        tracer::tracer(&camera, &scene, & mut pool, &mut white_buffer);
+        if gpu {
+        } else {
+            tracer::tracer(&camera, &scene, &mut pool, &mut white_buffer);
+        }
 
 
         let dynamic_state = DynamicState {
@@ -317,15 +364,33 @@ fn main() {
         let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
 
 
-        let command_buffer =
-            AutoCommandBufferBuilder ::new(device.clone(), queue.family()).unwrap()
-            .copy_buffer_to_image(sub_buffer.clone(), Arc::clone(&image)).unwrap()
+        let command_buffer_builder = AutoCommandBufferBuilder::new(device.clone(), queue.family())
+            .unwrap();
+        let command_buffer_builder = if gpu {
+            command_buffer_builder
+        } else {
+            command_buffer_builder
+                .copy_buffer_to_image(sub_buffer.clone(), Arc::clone(&image))
+                .unwrap()
+        };
+        let command_buffer = command_buffer_builder
             .begin_render_pass(framebuffers.as_ref().unwrap()[image_num].clone(), false, vec![[0.0, 0.0, 0.0, 1.0].into(), 1.0.into()],).unwrap()
             .draw_indexed(graphics_pipeline.clone(), dynamic_state, vertex_buffer.clone(), index_buffer.clone(), graphics_set.clone(), ()).unwrap()
             .end_render_pass().unwrap()
             .build().unwrap();
+        let compute_command_buffer_builder =
+            AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
+
+        let compute_command_buffer_builder = if gpu {
+            compute_command_buffer_builder.dispatch([1024 / 8, 1024 / 8, 1], compute_pipeline.clone(), compute_set.clone(), ()).unwrap()
+        } else {
+            compute_command_buffer_builder
+        };
+        let compute_command_buffer = compute_command_buffer_builder.build().unwrap();
 
         let future = previous_frame_end
+            .then_execute(queue.clone(), compute_command_buffer)
+            .unwrap()
             .join(acquire_future)
             .then_execute(queue.clone(), command_buffer)
             .unwrap()
@@ -344,6 +409,9 @@ fn main() {
                             recreate_swapchain = true;
                         }
                         WindowEvent::KeyboardInput { input, .. } => {
+                            if input.virtual_keycode.unwrap() == VirtualKeyCode::G {
+                                gpu = !gpu;
+                            }
                             camera.handle_input(input.virtual_keycode.unwrap());
                         }
                         _ => {}
