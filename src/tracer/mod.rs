@@ -123,7 +123,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
             let biasn = BIAS * i.normal;
             match i.material {
                 Material::Conductor { spec, color } => {
-                    let s = spec;
+                    let s = schlick(ray.direction, i.normal, spec);
                     let d = 1.0 - s;
                     let refraction = d *
                         direct_illumination(&scene, i.intersection, i.normal, color);
@@ -152,22 +152,27 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     let refr_amount = 1.0 - refl_amount;
 
                     let refr = if let Some(dir) = refract(ray.direction, norm_refrac, n1n2) {
+                        let ray = Ray {
+                            origin: i.intersection + bias_refrac,
+                            direction: dir,
+                        };
                         let distance = scene
                             .nearest_intersection(ray)
                             .map(|x| x.distance)
-                            .unwrap_or(f32::INFINITY);
+                            .unwrap_or(0.0);
                         let absorbance = absorbance * -distance;
-                        let transparency = Vector3::new(
-                            absorbance.x.exp(),
-                            absorbance.y.exp(),
-                            absorbance.z.exp(),
-                        );
+                        let transparency = if outside { 
+                            Vector3::new(
+                                absorbance.x.exp(),
+                                absorbance.y.exp(),
+                                absorbance.z.exp(),
+                            )
+                        } else {
+                            Vector3::new(1.0,1.0,1.0)
+                        };
                         transparency.mul_element_wise(trace(
                             &scene,
-                            Ray {
-                                origin: i.intersection + bias_refrac,
-                                direction: dir,
-                            },
+                            ray,
                             depth - 1,
                         ))
                     } else {
