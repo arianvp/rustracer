@@ -41,9 +41,12 @@ Rendering is performed by Vulkan. Vulkan is the successor of both OpenGL
     to rebuild the BVH in parallel during rendering.
 
 
-\subsubsection{Realistic refraction}
+\subsubsection{Realistic refractions and Reflections}
 Realistic refraction has been implemented using Schlicks approximation of the Frensel equations
-and Beer's law for absorbance.:
+and Beer's law for absorbance.
+
+I decided to use Schlick's approxmiation for reflective surfaces as well. This gives a bit more realism to
+our reflective surfaces.
 
 \subsubsection{Triangle meshes and OBJ loader}
 Triangle meshes are supported. I also support loading in triangle meshes from OBJ files.
@@ -57,31 +60,58 @@ Currently, there are some limitations:
   \item Texture mapping is not implemented
 \end{itemize}
 
-\subsubsection{Multiple light sources}
-Multiple light sources are supported. Though they are all point lights.
+\subsubsection{Multiple light sources and Area lights}
+Multiple light sources are supported. Furthermore, area lights are simulated
+by taking four random samples on a square. This creates nice diffuse shadows.
 
 \subsubsection{Multithreading}
 On the CPU, work is divided evenly over all cores. For this I use the \texttt{scoped\_threadpool} library.
 
 \subsubsection{Performance tuning}
+\begin{verbatim}
+  83.82%  testit   testit                             [.] nearest_intersection
+   6.71%  testit   testit                             [.] testit::tracer::trace
+   2.38%  testit   libm-2.26.so                       [.] __expf_finite
+   2.33%  testit   testit                             [.] <F as scoped_threadpool::FnBox>::call_box
+   1.71%  testit   testit                             [.] half::convert::f32_to_f16
+   0.81%  testit   libm-2.26.so                       [.] expf
+   0.61%  testit   [kernel.vmlinux]                   [k] entry_SYSCALL_64_fastpath
+   0.42%  testit   [kernel.vmlinux]                   [k] native_irq_return_iret
+   0.21%  rustc    ld-2.26.so                         [.] do_lookup_x
+   0.20%  testit   testit                             [.] <vulkano::buffer::cpu_pool::CpuBufferPool<T, A>>::try_next_impl
+   0.15%  testit   testit                             [.] expf@plt
+   0.09%  rustc    ld-2.26.so                         [.] strcmp
+   0.08%  rustc    ld-2.26.so                         [.] check_match
+\end{verbatim}
+Performance tuning was done before implementing area lights.
+
 Using the \texttt{prof} sampling profiling tool, it was found that almost all time of the
-program (72 percent) was spent in the triangle intersection code, so I decided to tackle only only that code.
+program (82 percent) was spent in the intersection code, Further inspecting the assembly,
+I found out that most of that time is spent in the inlined version of the triangle intersection code
+so I decided to tackle only only that code.
 
-First of all, we start with a classic high level optimisation. Early out. I enabled \emph{backface culling} for diffuse materials. This improves the performance a lot!
-Without it, most viewing angles give us a seconds per frame of around $1.60$ seconds.  But with back-face culling
-enabled, seconds per frame drops down to $0.7$ seconds at certain viewing angles.
+First of all, we start with a classic high level optimisation. Early out. I
+enabled \emph{backface culling} for diffuse materials. This improves the
+performance a lot!  Without it, most viewing angles give us a seconds per frame
+of around $1.60$ seconds.  But with back-face culling enabled, seconds per
+frame drops down to $0.7$ seconds at certain viewing angles.
 
-Second of all, I have rewritten the triangle intersect code using SIMD intrinsics. (See \texttt{src/tracer/primitive/triangle.rs, src/vec/mod.rs})
+Second of all, I have rewritten the triangle intersect code using SIMD
+intrinsics. (See \texttt{src/tracer/primitive/triangle.rs, src/vec/mod.rs})
 
-This
-brings down the average seconds per frame to $1.02$ seconds, whilst the best case is still around $0.7$ seconds.
-However, some small artifacts appear in the triangles. Either this is due to a bug, or due to the fact that
-the \emph{Reciprocal} instruction is only an approximation. I have not yet had time to debug this, but would be interesting to look at in asssignment two.
+This brings down the average seconds per frame to $1.02$ seconds, whilst the
+best case is still around $0.7$ seconds.  However, some small artifacts appear
+in the triangles. Either this is due to a bug, or due to the fact that the
+\emph{Reciprocal} instruction is only an approximation. I have not yet had time
+to debug this, but would be interesting to look at in asssignment two.
 
-A final profiling round shows that the handwritten SIMD code is now dominated by converting between
-SIMD \texttt{f32x4} and Rust's \texttt{Vector3}.  I use \texttt{Vector3} in all of the other code, so
-I only convert to \texttt{f32x4} when doing the triangle intersect. But apparently, this has quite some overhead.
-However, due to time constraints, I was not yet able to move fully to \texttt{f32x4} for all vector arithmetic so I will leave this as a promising next step for Assignment two.
+A final profiling round shows that the handwritten SIMD code is now dominated
+by converting between SIMD \texttt{f32x4} and Rust's \texttt{Vector3}.  I use
+\texttt{Vector3} in all of the other code, so I only convert to \texttt{f32x4}
+when doing the triangle intersect. But apparently, this has quite some
+overhead.  However, due to time constraints, I was not yet able to move fully
+to \texttt{f32x4} for all vector arithmetic so I will leave this as a promising
+next step for Assignment two.
 
 
 
@@ -106,9 +136,11 @@ all the dependencies and fire up the ray tracer.
 
 
 \section{Sources}
-As I already told Jacco Bikker, last year I worked together with Renier Maas on his path tracer that he built
-for Advanced Graphics. I worked  on parallelisation and safe multi-threading for the Conepts of Program Design course.
-Source code of that tracer can be found here: \url{https://github.com/arianvp/PathTracer}.
+As I already told Jacco Bikker, last year I worked together with Renier Maas on
+his path tracer that he built for Advanced Graphics. I worked  on
+parallelisation and safe multi-threading for the Conepts of Program Design
+course.  Source code of that tracer can be found here:
+\url{https://github.com/arianvp/PathTracer}.
 
 The free camera is based off the free camera I have had lying around since
 Bachelor year two, which was then used in a GPU Path Tracer assignment in the
@@ -117,8 +149,9 @@ Tracer (As I implemented it there). It has all kinds of advanced movement, but
 also support for depth of field (if used in a path tracer), and changing the
 field of view.
 
-Multi-threading is very similar as that previous path tracer. Chunks of memory are simply
-submitted to a threadpool using the \texttt{scoped\_threadpool} library.
+Multi-threading is very similar as that previous path tracer (as I also wrote
+that). Chunks of memory are simply submitted to a threadpool using the
+\texttt{scoped\_threadpool} library.
 
 Finally I'd like to note that \url{https://www.scratchapixel.com/} is a
 \emph{great} resource for learning about computer graphics.  I referenced it a
