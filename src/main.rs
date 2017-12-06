@@ -391,6 +391,7 @@ fn main() {
         let future = previous_frame_end
             .then_execute(queue.clone(), compute_command_buffer)
             .unwrap()
+            .then_signal_fence_and_flush().unwrap()
             .join(acquire_future)
             .then_execute(queue.clone(), command_buffer)
             .unwrap()
