@@ -42,35 +42,5 @@ impl Primitive for Sphere {
             intersection: intersection,
             distance: t0,
         })
-        /*let intersection = ray.origin + ray.direction * t0;
-        let normal = (intersection - position).normalize();
-        let normal = if inside { -normal} else { normal };
-
-        let m = ray.origin - self.position;
-        let b = m.dot(ray.direction);
-        let c = m.dot(m) - (self.radius * self.radius);
-        if c > 0.0 && b > 0.0 {
-            return None
-        }
-        let d = b * b - c;
-        if d < 0.0 {
-            return None
-        }
-        let mut normal_mult = 1.0;
-        let mut t = -b - d.sqrt();
-        if t < 0.0 {
-            t = -b + d.sqrt();
-            normal_mult = -1.0;
-        }
-        let intersection = ray.origin + ray.direction*t;
-        let normal = (intersection - self.position).normalize(); // * normal_mult;
-
-
-        Some(Intersection {
-            material: self.material,
-            normal,
-            intersection: intersection,
-            distance: t,
-        })*/
     }
 }
