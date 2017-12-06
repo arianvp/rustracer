@@ -3,6 +3,7 @@ pub mod primitive;
 pub mod ray;
 pub mod scene;
 pub mod mesh;
+pub mod morton;
 
 use cgmath::{InnerSpace, ElementWise, Array};
 use cgmath::{Vector3, Point3};
@@ -146,21 +147,30 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     let norm_refrac = if outside { i.normal } else { -i.normal };
                     let bias_refrac = if outside { -biasn } else { biasn };
                     let n1n2 = n1 / n2;
-                    // origin: i.intersection + if outside { biasn } else { -biasn },
 
                     let mut refl_amount =
                         schlick(ray.direction, norm_refrac, (n2 - n1) / (n1 + n2).powi(2));
                     let refr_amount = 1.0 - refl_amount;
 
                     let refr = if let Some(dir) = refract(ray.direction, norm_refrac, n1n2) {
-                        trace(
+                        let distance = scene
+                            .nearest_intersection(ray)
+                            .map(|x| x.distance)
+                            .unwrap_or(f32::INFINITY);
+                        let absorbance = absorbance * -distance;
+                        let transparency = Vector3::new(
+                            absorbance.x.exp(),
+                            absorbance.y.exp(),
+                            absorbance.z.exp(),
+                        );
+                        transparency.mul_element_wise(trace(
                             &scene,
                             Ray {
                                 origin: i.intersection + bias_refrac,
                                 direction: dir,
                             },
                             depth - 1,
-                        )
+                        ))
                     } else {
                         refl_amount = 1.0;
                         Vector3::from_value(0.)

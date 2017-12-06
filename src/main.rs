@@ -1,3 +1,5 @@
+#![feature(fused)]
+#![feature(exact_size_is_empty)] 
 
 #[macro_use]
 extern crate vulkano_shader_derive;
@@ -12,6 +14,7 @@ extern crate scoped_threadpool;
 extern crate simd;
 extern crate half;
 extern crate tobj;
+extern crate morton;
 
 mod shaders;
 mod tracer;

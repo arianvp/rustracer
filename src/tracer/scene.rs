@@ -46,7 +46,7 @@ impl Scene {
             Material::Dielectric {
                 n1: 1.0,
                 n2: 1.06,
-                absorbance: Vector3::new(0.0, 0.0, 0.0),
+                absorbance: Vector3::new(0.5, 0.1, 0.4),
             },
         ).expect("Error loading");
         let mut triangles = mesh1.triangles;
@@ -69,7 +69,7 @@ impl Scene {
                     normal: Vector3::new(0.0, 1.0, 0.0),
                     material: Material::Conductor {
                         spec: 0.0,
-                        color: Vector3::new(0.0, 1.0, 0.0),
+                        color: Vector3::new(0.3, 1.0, 0.3),
                     },
                 },
             ],
@@ -77,7 +77,7 @@ impl Scene {
                 Sphere {
                     material: Material::Conductor {
                         spec: 0.3,
-                        color: Vector3::new(1.0, 0.0, 0.0),
+                        color: Vector3::new(1.0, 0.0, 0.3),
                     },
                     position: Point3::new(0.0, 1.0, 0.0),
                     radius: 0.5,
@@ -86,7 +86,7 @@ impl Scene {
                     material: Material::Dielectric {
                         n1: 1.0,
                         n2: 1.06,
-                        absorbance: Vector3::new(0.0, 0.0, 0.0),
+                        absorbance: Vector3::new(0.9, 0.9, 0.2),
                     },
                     position: Point3::new(5.0, 1.0, 0.0),
                     radius: 1.0,
