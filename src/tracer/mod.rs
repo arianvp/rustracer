@@ -25,7 +25,28 @@ pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, buffer: &mut Vec<
     let n = pool.thread_count() as usize;
     // NOTE: this multi-threading is taken from my previous tracer on which I worked together on
     // with with Renier Maas, who did the course last year.
-    pool.scoped(|scope| for (task_num, mut chunk) in
+
+
+    let task_size = 8;
+    let tasks = buffer.chunks_mut(camera.width * camera.height / task_size);
+    let num_tasks = camera.width / task_size;
+
+
+
+    pool.scoped(|scope| for (task_num, mut chunk) in tasks.enumerate() {
+
+        scope.execute(move || for j in 0 .. chunk.len() {
+            let idx = j + task_num*chunk.len();
+            let y = idx / camera.width;
+            let x = idx % camera.width;
+            let color = trace(scene, camera.generate(x, y), 5);
+            for i in 0..3 {
+                chunk[j][i] = f16::from_f32(color[i]);
+            }
+        });
+    });
+
+    /*pool.scoped(|scope| for (task_num, mut chunk) in
         buffer
             .chunks_mut(camera.width * camera.height / n)
             .enumerate()
@@ -42,7 +63,7 @@ pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, buffer: &mut Vec<
                 }
             }
         })
-    })
+    })*/
 
 }
 
@@ -69,12 +90,14 @@ fn direct_illumination(
                 let Closed01(off_x) = random::<Closed01<f32>>();
                 let Closed01(off_y) = random::<Closed01<f32>>();
                 let origin = intersection;
-                let direction = (light.position + Vector3::new(off_x / 10.0, off_y / 10.0, 0.0)  - intersection).normalize();
+                let direction = (light.position + Vector3::new(off_x / 10.0, off_y / 10.0, 0.0) -
+                                     intersection)
+                    .normalize();
                 let ray = Ray {
                     origin: origin + normal * BIAS,
                     direction,
                 };
-                if !scene.nearest_intersection(ray).is_some() {
+                if normal.dot(direction) >=0. && !scene.nearest_intersection(ray).is_some() {
                     to_mul += brdf(intersection, normal, light) / 4.0
                 }
             }
@@ -128,7 +151,11 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
             let biasn = BIAS * i.normal;
             match i.material {
                 Material::Conductor { spec, color } => {
-                    let s = if spec == 0.0 { 0.0} else { schlick(ray.direction, i.normal, spec) };
+                    let s = if spec == 0.0 {
+                        0.0
+                    } else {
+                        schlick(ray.direction, i.normal, spec)
+                    };
                     let d = 1.0 - s;
                     let refraction = d *
                         direct_illumination(&scene, i.intersection, i.normal, color);
@@ -166,20 +193,12 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                             .map(|x| x.distance)
                             .unwrap_or(0.0);
                         let absorbance = absorbance * -distance;
-                        let transparency = if outside { 
-                            Vector3::new(
-                                absorbance.x.exp(),
-                                absorbance.y.exp(),
-                                absorbance.z.exp(),
-                            )
+                        let transparency = if outside {
+                            Vector3::new(absorbance.x.exp(), absorbance.y.exp(), absorbance.z.exp())
                         } else {
-                            Vector3::new(1.0,1.0,1.0)
+                            Vector3::new(1.0, 1.0, 1.0)
                         };
-                        transparency.mul_element_wise(trace(
-                            &scene,
-                            ray,
-                            depth - 1,
-                        ))
+                        transparency.mul_element_wise(trace(&scene, ray, depth - 1))
                     } else {
                         refl_amount = 1.0;
                         Vector3::from_value(0.)
