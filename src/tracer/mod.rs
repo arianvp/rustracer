@@ -25,11 +25,17 @@ struct Morton(*mut [f16; 4]);
 unsafe impl Send for Morton {}
 unsafe impl Sync for Morton {}
 
-pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, morton_lut: &Vec<(usize, usize)>, buffer: &mut Vec<[f16; 4]>) {
+pub fn tracer(
+    camera: &Camera,
+    scene: &Scene,
+    pool: &mut Pool,
+    morton_lut: &Vec<(usize, usize)>,
+    buffer: &mut Vec<[f16; 4]>,
+) {
     let n = pool.thread_count() as usize;
     let mut_buffer = Arc::new(Morton(buffer.as_mut_ptr()));
 
-    let all = morton_lut.chunks(8 * 8);
+    let all = morton_lut.chunks(128 * 128);
 
 
     // NOTE: this multi-threading is taken from my previous tracer on which I worked together on
@@ -38,16 +44,18 @@ pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, morton_lut: &Vec<
 
     pool.scoped(|scope| for chunk in all {
         let mut_buffer = mut_buffer.clone();
-        scope.execute(move || for &(x, y) in chunk {
-            let color = trace(scene, camera.generate(x, y), 5);
+        scope.execute(move || for packet in chunk.chunks(4) {
+            for &(x, y) in packet {
+                let color = trace(scene, camera.generate(x, y), 5);
 
-            let Morton(mut_buffer) = *mut_buffer;
-            // TODO, it is hard to convince the borrow checker that accessing a buffer
-            // in morton order is safe and doesn't cause any aliasing bugs
-            unsafe {
-                for i in 0..3 {
-                    (*mut_buffer.offset((x + y * camera.width) as isize))[i] =
-                        f16::from_f32(color[i]);
+                let Morton(mut_buffer) = *mut_buffer;
+                // TODO, it is hard to convince the borrow checker that accessing a buffer
+                // in morton order is safe and doesn't cause any aliasing bugs
+                unsafe {
+                    for i in 0..3 {
+                        (*mut_buffer.offset((x + y * camera.width) as isize))[i] =
+                            f16::from_f32(color[i]);
+                    }
                 }
             }
         });
