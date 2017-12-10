@@ -17,6 +17,7 @@ extern crate half;
 extern crate tobj;
 extern crate morton;
 extern crate rand;
+extern crate threadpool;
 
 mod shaders;
 mod tracer;
@@ -86,6 +87,7 @@ fn get_device(physical: &PhysicalDevice, window: &Window) -> (Arc<Device>, Arc<Q
     let graphics_queue = queues.next().unwrap();
     (graphics_device, graphics_queue)
 }
+
 
 
 const WIDTH: usize = 1024;
@@ -363,7 +365,6 @@ fn main() {
         // there is no AcceptsPixels<&u8> instance. Luckily u8 is Copy, and thus
         // we can iterate over the buffer by reference, but copy the underlying
         // elements, yielding a [u8] instead of an [&u8]
-        let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
 
 
         let command_buffer_builder = AutoCommandBufferBuilder::new(device.clone(), queue.family())
@@ -371,6 +372,7 @@ fn main() {
         let command_buffer_builder = if gpu {
             command_buffer_builder
         } else {
+            let sub_buffer = buffer_pool.chunk(white_buffer.iter().cloned()).unwrap();
             command_buffer_builder
                 .copy_buffer_to_image(sub_buffer.clone(), Arc::clone(&image))
                 .unwrap()

@@ -17,6 +17,8 @@ scoped_threadpool = "*"
 morton = "*"
 stdsimd = "*"
 rand = "*"
+threadpool = "*"
+crossbeam = "*"
 
 [profile.release]
 debug = true

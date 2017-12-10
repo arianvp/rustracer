@@ -3,13 +3,13 @@ pub mod primitive;
 pub mod ray;
 pub mod scene;
 pub mod mesh;
-pub mod morton;
 
 use cgmath::{InnerSpace, ElementWise, Array};
 use cgmath::{Vector3, Point3};
 use std::f32;
 use std::mem;
-use rand::{random, Closed01};
+use std::sync::Arc;
+use morton;
 
 use scoped_threadpool::Pool;
 
@@ -21,50 +21,44 @@ use self::camera::Camera;
 use self::primitive::{Light, Material};
 
 
+struct Morton(*mut [f16; 4]);
+unsafe impl Send for Morton {}
+unsafe impl Sync for Morton {}
+
 pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, buffer: &mut Vec<[f16; 4]>) {
     let n = pool.thread_count() as usize;
+    let mut_buffer = Arc::new(Morton(buffer.as_mut_ptr()));
+
+    // TODO precompute
+    let all: Vec<_> = (0..camera.width * camera.height)
+        .map(|x| {
+            let (i, j) = morton::deinterleave_morton(x as u32);
+            (i as usize, j as usize)
+        })
+        .collect();
+    let all = all.chunks(8 * 8);
+
+
     // NOTE: this multi-threading is taken from my previous tracer on which I worked together on
     // with with Renier Maas, who did the course last year.
 
 
-    let task_size = 8;
-    let tasks = buffer.chunks_mut(camera.width * camera.height / task_size);
-    let num_tasks = camera.width / task_size;
-
-
-
-    pool.scoped(|scope| for (task_num, mut chunk) in tasks.enumerate() {
-
-        scope.execute(move || for j in 0 .. chunk.len() {
-            let idx = j + task_num*chunk.len();
-            let y = idx / camera.width;
-            let x = idx % camera.width;
+    pool.scoped(|scope| for chunk in all {
+        let mut_buffer = mut_buffer.clone();
+        scope.execute(move || for &(x, y) in chunk {
             let color = trace(scene, camera.generate(x, y), 5);
-            for i in 0..3 {
-                chunk[j][i] = f16::from_f32(color[i]);
+
+            let Morton(mut_buffer) = *mut_buffer;
+            // TODO, it is hard to convince the borrow checker that accessing a buffer
+            // in morton order is safe and doesn't cause any aliasing bugs
+            unsafe {
+                for i in 0..3 {
+                    (*mut_buffer.offset((x + y * camera.width) as isize))[i] =
+                        f16::from_f32(color[i]);
+                }
             }
         });
     });
-
-    /*pool.scoped(|scope| for (task_num, mut chunk) in
-        buffer
-            .chunks_mut(camera.width * camera.height / n)
-            .enumerate()
-    {
-        scope.execute(move || {
-            let start_y = task_num * (camera.height / n);
-            for y in 0..camera.height / n {
-                for x in 0..camera.width {
-                    let color = trace(scene, camera.generate(x, y + start_y), 5);
-                    let idx = x + y * camera.width;
-                    for i in 0..3 {
-                        chunk[idx][i] = f16::from_f32(color[i]);
-                    }
-                }
-            }
-        })
-    })*/
-
 }
 
 pub fn brdf(intersection: Point3<f32>, normal: Vector3<f32>, light: &Light) -> f32 {
@@ -84,22 +78,15 @@ fn direct_illumination(
     scene.lights.iter().fold(
         Vector3::new(0.0, 0.0, 0.0),
         |accum, light| {
-
             let mut to_mul = 0.0;
-            for i in 0..4 {
-                let Closed01(off_x) = random::<Closed01<f32>>();
-                let Closed01(off_y) = random::<Closed01<f32>>();
-                let origin = intersection;
-                let direction = (light.position + Vector3::new(off_x / 10.0, off_y / 10.0, 0.0) -
-                                     intersection)
-                    .normalize();
-                let ray = Ray {
-                    origin: origin + normal * BIAS,
-                    direction,
-                };
-                if normal.dot(direction) >=0. && !scene.nearest_intersection(ray).is_some() {
-                    to_mul += brdf(intersection, normal, light) / 4.0
-                }
+            let origin = intersection;
+            let direction = (light.position - intersection).normalize();
+            let ray = Ray {
+                origin: origin + normal * BIAS,
+                direction,
+            };
+            if normal.dot(direction) >= 0. && !scene.nearest_intersection(ray).is_some() {
+                to_mul += brdf(intersection, normal, light) / 4.0
             }
 
             accum + (to_mul * color)
@@ -165,7 +152,7 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                         origin: i.intersection + biasn,
                         direction: r,
                     };
-                    let reflection = s * trace(scene, ray, depth - 1);
+                    let reflection = if s == 0. { Vector3::new(0.,0.,0.) }  else { s * trace(scene, ray, depth - 1) };
                     reflection + refraction
                 }
                 Material::Dielectric { absorbance, n1, n2 } => {
@@ -198,22 +185,24 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                         } else {
                             Vector3::new(1.0, 1.0, 1.0)
                         };
-                        transparency.mul_element_wise(trace(&scene, ray, depth - 1))
+                        let k = if refr_amount == 0. { 
+                            Vector3::new(0.,0.,0.)
+                        } else {
+                            trace(&scene, ray, depth - 1)
+                        };
+                        transparency.mul_element_wise(k)
                     } else {
                         refl_amount = 1.0;
                         Vector3::from_value(0.)
                     };
 
-
-                    refl_amount *
-                        trace(
-                            &scene,
-                            Ray {
-                                origin: i.intersection + bias_refrac,
-                                direction: reflect(ray.direction, i.normal),
-                            },
-                            depth - 1,
-                        ) + refr_amount * refr
+                    let refl = if refl_amount == 0. {
+                        Vector3::new(0.,0.,0.)
+                    } else {
+                        trace( &scene, Ray { origin: i.intersection + bias_refrac, direction: reflect(ray.direction, i.normal), }, depth - 1,) 
+                    };
+                    refl_amount * refl
+                        + refr_amount * refr
 
                 }
             }
