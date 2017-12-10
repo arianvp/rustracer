@@ -25,18 +25,11 @@ struct Morton(*mut [f16; 4]);
 unsafe impl Send for Morton {}
 unsafe impl Sync for Morton {}
 
-pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, buffer: &mut Vec<[f16; 4]>) {
+pub fn tracer(camera: &Camera, scene: &Scene, pool: &mut Pool, morton_lut: &Vec<(usize, usize)>, buffer: &mut Vec<[f16; 4]>) {
     let n = pool.thread_count() as usize;
     let mut_buffer = Arc::new(Morton(buffer.as_mut_ptr()));
 
-    // TODO precompute
-    let all: Vec<_> = (0..camera.width * camera.height)
-        .map(|x| {
-            let (i, j) = morton::deinterleave_morton(x as u32);
-            (i as usize, j as usize)
-        })
-        .collect();
-    let all = all.chunks(8 * 8);
+    let all = morton_lut.chunks(8 * 8);
 
 
     // NOTE: this multi-threading is taken from my previous tracer on which I worked together on
@@ -152,7 +145,11 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                         origin: i.intersection + biasn,
                         direction: r,
                     };
-                    let reflection = if s == 0. { Vector3::new(0.,0.,0.) }  else { s * trace(scene, ray, depth - 1) };
+                    let reflection = if s == 0. {
+                        Vector3::new(0., 0., 0.)
+                    } else {
+                        s * trace(scene, ray, depth - 1)
+                    };
                     reflection + refraction
                 }
                 Material::Dielectric { absorbance, n1, n2 } => {
@@ -185,8 +182,8 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                         } else {
                             Vector3::new(1.0, 1.0, 1.0)
                         };
-                        let k = if refr_amount == 0. { 
-                            Vector3::new(0.,0.,0.)
+                        let k = if refr_amount == 0. {
+                            Vector3::new(0., 0., 0.)
                         } else {
                             trace(&scene, ray, depth - 1)
                         };
@@ -197,12 +194,18 @@ fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {
                     };
 
                     let refl = if refl_amount == 0. {
-                        Vector3::new(0.,0.,0.)
+                        Vector3::new(0., 0., 0.)
                     } else {
-                        trace( &scene, Ray { origin: i.intersection + bias_refrac, direction: reflect(ray.direction, i.normal), }, depth - 1,) 
+                        trace(
+                            &scene,
+                            Ray {
+                                origin: i.intersection + bias_refrac,
+                                direction: reflect(ray.direction, i.normal),
+                            },
+                            depth - 1,
+                        )
                     };
-                    refl_amount * refl
-                        + refr_amount * refr
+                    refl_amount * refl + refr_amount * refr
 
                 }
             }

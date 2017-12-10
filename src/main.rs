@@ -245,6 +245,14 @@ fn main() {
     ];
         WIDTH * HEIGHT
     ];
+
+    let morton_lut: Vec<_> = (0..WIDTH * HEIGHT)
+        .map(|x| {
+            let (i, j) = morton::deinterleave_morton(x as u32);
+            (i as usize, j as usize)
+        })
+        .collect();
+
     let buffer_pool = CpuBufferPool::upload(Arc::clone(&device));
 
     let scene = Scene::new();
@@ -294,7 +302,7 @@ fn main() {
 
         if gpu {
         } else {
-            tracer::tracer(&camera, &scene, &mut pool, &mut white_buffer);
+            tracer::tracer(&camera, &scene, &mut pool, &morton_lut, &mut white_buffer);
         }
 
 
