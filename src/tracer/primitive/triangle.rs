@@ -1,14 +1,13 @@
 use cgmath::{Vector3, Point3};
 use cgmath::InnerSpace;
 use tracer::ray::Ray;
-use tracer::ray::Ray2;
 use std::f32;
 use tracer::primitive::{Material, Intersection, Primitive};
 use stdsimd::simd::f32x4;
 use stdsimd::vendor;
-use vec::{dot,cross, vec_to_f32x4, pnt_to_f32x4, f32x4_to_pnt, f32x4_to_vec};
+use vec::{dot, cross, vec_to_f32x4, pnt_to_f32x4, f32x4_to_pnt, f32x4_to_vec};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub struct Triangle {
     pub p0: Point3<f32>,
     pub p1: Point3<f32>,
@@ -79,21 +78,12 @@ fn intersect_simd(
 
 impl Primitive for Triangle {
     fn intersect(&self, ray: Ray) -> Option<Intersection> {
-        /*intersect_simd(
-            pnt_to_f32x4(self.p0),
-            pnt_to_f32x4(self.p1),
-            pnt_to_f32x4(self.p2),
-            pnt_to_f32x4(ray.origin),
-            vec_to_f32x4(ray.direction),
-            self.normal,
-            self.material,
-        )*/
-        
         let e1 = self.p1 - self.p0;
         let e2 = self.p2 - self.p0;
         let p = ray.direction.cross(e2);
         let det = e1.dot(p);
 
+        // backface culling
         if let Material::Conductor{..} = self.material {
             if det < f32::EPSILON {
                 return None

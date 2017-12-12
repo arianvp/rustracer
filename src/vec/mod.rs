@@ -1,7 +1,21 @@
 use stdsimd::simd::f32x4;
 use stdsimd::vendor;
 use cgmath::{Vector3, Point3};
+use cgmath::EuclideanSpace;
 
+
+#[derive(Debug, Copy, Clone)]
+pub struct Vec3x4 {
+    x4: f32x4,
+    y4: f32x4,
+    z4: f32x4,
+}
+
+pub struct Color4 {
+    r4: f32x4,
+    g4: f32x4,
+    b4: f32x4,
+}
 
 #[inline]
 pub fn vec_to_f32x4(x: Vector3<f32>) -> f32x4 {

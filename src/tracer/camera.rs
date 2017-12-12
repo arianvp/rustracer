@@ -1,7 +1,7 @@
 use cgmath::{Vector3, Point3};
 use cgmath::InnerSpace;
 use winit::VirtualKeyCode;
-use super::ray::Ray;
+use super::ray::{Ray, Ray4};
 use std::f32;
 
 
@@ -129,4 +129,16 @@ impl Camera {
         let direction = (target - origin).normalize();
         Ray{origin, direction}
     }
+
+    /*pub fn generate4(&self, mortons: [(usize,usize);4]) -> Ray4 {
+        let mut ray = Ray{}
+        for i in 0..4{
+            let (x,y) = morton[i];
+            let u = ((x as f32)) / (self.width as f32);
+            let v = ((y as f32)) / (self.height as f32);
+            rayii.
+        }
+        ray
+    }*/
+
 }

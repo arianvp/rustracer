@@ -10,18 +10,20 @@ use std::f32;
 use std::mem;
 use std::sync::Arc;
 use morton;
+use vec::Vec3x4;
 
 use scoped_threadpool::Pool;
 
 
 use half::f16;
 use self::scene::Scene;
-use self::ray::Ray;
+use self::ray::{Ray, Ray4};
 use self::camera::Camera;
 use self::primitive::{Light, Material};
 
 
 struct Morton(*mut [f16; 4]);
+
 unsafe impl Send for Morton {}
 unsafe impl Sync for Morton {}
 
@@ -41,12 +43,13 @@ pub fn tracer(
     // NOTE: this multi-threading is taken from my previous tracer on which I worked together on
     // with with Renier Maas, who did the course last year.
 
-
-    pool.scoped(|scope| for chunk in all {
+    // TODO fuck scoped threadpool. we don't need its guarentees
+    pool.scoped(|scope| for (i,chunk) in all.enumerate() {
         let mut_buffer = mut_buffer.clone();
-        scope.execute(move || for packet in chunk.chunks(4) {
-            for &(x, y) in packet {
+        scope.execute(move || for chunk in chunk.chunks(4) {
+            for &(x, y) in chunk {
                 let color = trace(scene, camera.generate(x, y), 5);
+                //let color = Vector3::from_value(i as f32 / ((1024.0 * 1024.0) / (512.0 * 512.0)));
 
                 let Morton(mut_buffer) = *mut_buffer;
                 // TODO, it is hard to convince the borrow checker that accessing a buffer
@@ -86,9 +89,9 @@ fn direct_illumination(
                 origin: origin + normal * BIAS,
                 direction,
             };
-            if normal.dot(direction) >= 0. && !scene.nearest_intersection(ray).is_some() {
-                to_mul += brdf(intersection, normal, light) / 4.0
-            }
+            /*if normal.dot(direction) >= 0. && !scene.nearest_intersection(ray).is_some() {*/
+            to_mul += brdf(intersection, normal, light) / 4.0;
+            /*}*/
 
             accum + (to_mul * color)
         },
@@ -126,7 +129,6 @@ fn schlick(direction: Vector3<f32>, normal: Vector3<f32>, r0: f32) -> f32 {
 
 
 const BIAS: f32 = 0.001;
-
 
 
 fn trace(scene: &Scene, ray: Ray, depth: u32) -> Vector3<f32> {

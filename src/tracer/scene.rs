@@ -51,7 +51,7 @@ impl Scene {
             },
         ).expect("Error loading");
         let mut triangles = mesh1.triangles;
-        triangles.extend(mesh2.triangles);
+       // triangles.extend(mesh2.triangles);
         Scene {
             triangles: triangles,
             lights: vec![
@@ -68,6 +68,14 @@ impl Scene {
                 Plane {
                     p0: Point3::new(0.0, 0.0, 0.0),
                     normal: Vector3::new(0.0, 1.0, 0.0),
+                    material: Material::Conductor {
+                        spec: 0.0,
+                        color: Vector3::new(0.3, 1.0, 0.3),
+                    },
+                },
+                Plane {
+                    p0: Point3::new(0.0, 40.0, 0.0),
+                    normal: Vector3::new(0.0, -1.0, 0.0),
                     material: Material::Conductor {
                         spec: 0.0,
                         color: Vector3::new(0.3, 1.0, 0.3),
