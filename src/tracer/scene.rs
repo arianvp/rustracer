@@ -33,10 +33,10 @@ impl Scene {
     pub fn new() -> Scene {
         let mesh1 = Mesh::load_from_path(
             &Path::new("./assets/cube.obj"),
-            Vector3::new(-0.5, 1.0, 1.0),
+            Vector3::new(-0.7, 1.3, 1.1),
             0.5,
             Material::Conductor {
-                spec: 0.0,
+                spec: 0.3,
                 color: Vector3::new(0.0, 0.0, 1.0),
             },
         ).expect("Error loading");

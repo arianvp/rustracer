@@ -22,4 +22,5 @@ crossbeam = "*"
 
 [profile.release]
 debug = true
+opt-level = 3
 
