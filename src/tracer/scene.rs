@@ -13,7 +13,7 @@ pub struct Scene {
     pub lights: Vec<Light>,
     pub planes: Vec<Plane>,
     pub spheres: Vec<Sphere>,
-    pub triangles: Vec<Triangle>,
+    pub meshes: Vec<Mesh>,
 }
 
 
@@ -50,10 +50,10 @@ impl Scene {
                 absorbance: Vector3::new(0.2, 3.0, 3.0),
             },
         ).expect("Error loading");
-        let mut triangles = mesh1.triangles;
+       // let mut triangles = mesh1.triangles;
        // triangles.extend(mesh2.triangles);
         Scene {
-            triangles: triangles,
+            meshes: vec![mesh1],
             lights: vec![
                 Light {
                     intensity: 9.0,
@@ -108,10 +108,10 @@ impl Scene {
         // we iterate over each of the primitives together for more cache coherence
         let plane = nearest_intersection_(&self.planes, ray);
         let sphere = nearest_intersection_(&self.spheres, ray);
-        let triangle = nearest_intersection_(&self.triangles, ray);
+        let mesh = nearest_intersection_(&self.meshes, ray);
 
         let mut nearest = None;
-        for y in [plane, sphere, triangle].iter() {
+        for y in [plane, sphere, mesh].iter() {
             if let &Some(ref i) = y {
                 let r: &mut Intersection = nearest.get_or_insert(i.clone());
                 if i.clone().distance < r.distance {

@@ -5,6 +5,8 @@ use tracer::primitive::{Material, Intersection, Primitive};
 use stdsimd::simd::f32x4;
 use stdsimd::vendor;
 use bvh::aabb::{AABB, Bounded};
+use bvh::bounding_hierarchy::{BoundingHierarchy, BHShape};
+
 
 #[derive(Debug)]
 pub struct Triangle {
@@ -15,6 +17,24 @@ pub struct Triangle {
     pub n0: Vector3<f32>,
     pub n1: Vector3<f32>,
     pub n2: Vector3<f32>,
+    pub node_index: usize,
+}
+
+impl Bounded for Triangle {
+    fn aabb(&self) -> AABB {
+        AABB::empty().grow(&self.p0).grow(&self.p1).grow(&self.p2)
+    }
+}
+
+
+impl BHShape for Triangle {
+    fn set_bh_node_index(&mut self, index: usize) {
+        self.node_index = index;
+    }
+
+    fn bh_node_index(&self) -> usize {
+        self.node_index
+    }
 }
 
 
