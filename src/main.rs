@@ -8,16 +8,14 @@ extern crate vulkano;
 extern crate vulkano_win;
 extern crate winit;
 extern crate image;
-extern crate cgmath;
+extern crate nalgebra;
 extern crate scoped_threadpool;
 
-extern crate simd;
 extern crate stdsimd;
 extern crate half;
 extern crate tobj;
 extern crate morton;
 extern crate rand;
-extern crate threadpool;
 
 mod shaders;
 mod tracer;

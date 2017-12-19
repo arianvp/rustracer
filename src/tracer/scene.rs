@@ -1,4 +1,4 @@
-use cgmath::{Vector3, Point3, Array};
+use nalgebra::{Vector3, Point3};
 use super::primitive::{Light, Primitive, Material, Intersection};
 use super::primitive::plane::Plane;
 use super::primitive::sphere::Sphere;
@@ -18,7 +18,7 @@ pub struct Scene {
 
 
 #[inline]
-fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: Ray) -> Option<Intersection> {
+fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: &Ray) -> Option<Intersection> {
     primitives.iter().filter_map(|p| p.intersect(ray)).min_by(
         |a, b| {
             a.distance.partial_cmp(&b.distance).unwrap_or(
@@ -36,7 +36,7 @@ impl Scene {
             Vector3::new(-0.7, 1.3, 1.1),
             0.5,
             Material::Conductor {
-                spec: 0.3,
+                spec: 0.0,
                 color: Vector3::new(0.0, 0.0, 1.0),
             },
         ).expect("Error loading");
@@ -104,7 +104,7 @@ impl Scene {
         }
     }
 
-    pub fn nearest_intersection(&self, ray: Ray) -> Option<Intersection> {
+    pub fn nearest_intersection(&self, ray: &Ray) -> Option<Intersection> {
         // we iterate over each of the primitives together for more cache coherence
         let plane = nearest_intersection_(&self.planes, ray);
         let sphere = nearest_intersection_(&self.spheres, ray);
@@ -112,10 +112,10 @@ impl Scene {
 
         let mut nearest = None;
         for y in [plane, sphere, triangle].iter() {
-            if let &Some(i) = y {
-                let r: &mut Intersection = nearest.get_or_insert(i);
-                if i.distance < r.distance {
-                    *r = i
+            if let &Some(ref i) = y {
+                let r: &mut Intersection = nearest.get_or_insert(i.clone());
+                if i.clone().distance < r.distance {
+                    *r = i.clone()
                 }
             }
         }

@@ -9,7 +9,7 @@ vulkano-shader-derive = "0.7"
 vulkano-win = "0.7"
 winit = "0.7"
 image = "*"
-cgmath = "*"
+nalgebra = "*"
 simd = "*"
 half = "*"
 tobj = "*"
@@ -17,8 +17,9 @@ scoped_threadpool = "*"
 morton = "*"
 stdsimd = "*"
 rand = "*"
-threadpool = "*"
-crossbeam = "*"
+
+[dependencies.bvh]
+path = "../bvh"
 
 [profile.release]
 debug = true

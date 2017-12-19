@@ -1,9 +1,9 @@
-use cgmath::{Point3, InnerSpace};
+use nalgebra::{Point3};
 use std::mem;
 use tracer::primitive::{Material, Intersection, Primitive};
 use tracer::ray::Ray;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub struct Sphere {
     pub position: Point3<f32>,
     pub radius: f32,
@@ -11,13 +11,13 @@ pub struct Sphere {
 }
 
 impl Primitive for Sphere {
-    fn intersect(&self, ray: Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let distance = self.position - ray.origin;
-        let tca = distance.dot(ray.direction);
+        let tca = distance.dot(&ray.direction);
         if tca < 0.0 {
             return None;
         }
-        let d2 = distance.dot(distance) - tca * tca;
+        let d2 = distance.dot(&distance) - tca * tca;
         let r2 = self.radius * self.radius;
         if d2 > r2 {
             return None;
@@ -37,7 +37,7 @@ impl Primitive for Sphere {
         let intersection = ray.origin + ray.direction * t0;
         let normal = (intersection - self.position).normalize();
         Some(Intersection {
-            material: self.material,
+            material: self.material.clone(),
             normal,
             intersection: intersection,
             distance: t0,

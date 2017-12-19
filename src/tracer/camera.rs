@@ -1,7 +1,6 @@
-use cgmath::{Vector3, Point3};
-use cgmath::InnerSpace;
+use nalgebra::{Vector3, Point3};
 use winit::VirtualKeyCode;
-use super::ray::{Ray, Ray4};
+use super::ray::{Ray}; 
 use std::f32;
 
 
@@ -52,8 +51,8 @@ impl Camera {
     pub fn update(&mut self) {
         self.direction = (self.target - self.origin).normalize();
         let unit_y = Vector3::new(0.0, 1.0, 0.0);
-        self.right = unit_y.cross(self.direction);
-        self.up = self.direction.cross(self.right);
+        self.right = unit_y.cross(&self.direction);
+        self.up = self.direction.cross(&self.right);
 
 
         let aspect_ratio = (self.width as f32) / (self.height as f32);

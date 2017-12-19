@@ -1,11 +1,9 @@
-use cgmath::{Vector3, Point3};
-use cgmath::InnerSpace;
+use nalgebra::{Vector3, Point3};
 use tracer::ray::Ray;
 use std::f32;
 use tracer::primitive::{Material, Intersection, Primitive};
 use stdsimd::simd::f32x4;
 use stdsimd::vendor;
-use vec::{dot, cross, vec_to_f32x4, pnt_to_f32x4, f32x4_to_pnt, f32x4_to_vec};
 
 #[derive(Debug)]
 pub struct Triangle {
@@ -17,71 +15,12 @@ pub struct Triangle {
 }
 
 
-struct Triangle2 {
-    p0: f32x4,
-    p1: f32x4,
-    p2: f32x4,
-    material: Material,
-    normal: Vector3<f32>,
-}
-
-// hand-rolled SIMD
-fn intersect_simd(
-    p0: f32x4,
-    p1: f32x4,
-    p2: f32x4,
-    origin: f32x4,
-    direction: f32x4,
-    normal: Vector3<f32>,
-    material: Material,
-) -> Option<Intersection> {
-    let e1 = p1 - p0;
-    let e2 = p2 - p0;
-    let p = cross(direction, e2);
-    let det = dot(e1, p);
-    let det1 = det.extract(0);
-    if let Material::Conductor{..} = material {
-       if det1 < f32::EPSILON {
-        return None
-       }
-    }
-    if (det1 > -f32::EPSILON && det1 < f32::EPSILON) {
-        return None;
-    }
-    let inv_det = unsafe { vendor::_mm_rcp_ps(det) };
-    let t = origin - p0;
-    let u = dot(t, p) * inv_det;
-    let u = u.extract(0);
-    if u < 0. || u > 1. {
-        return None;
-    }
-    let q = cross(t, e1);
-    let v = dot(direction, q) * inv_det;
-    let v = v.extract(0);
-    if v < 0. || u + v > 1. {
-        return None;
-    }
-    let t = dot(e2, q) * inv_det;
-
-    // TODO simd this
-    if t.extract(0) <= f32::EPSILON {
-        return None;
-    }
-    let intersection = origin + t * direction;
-    Some(Intersection {
-        intersection: f32x4_to_pnt(intersection),
-        normal: normal,
-        distance: t.extract(0),
-        material: material,
-    })
-}
-
 impl Primitive for Triangle {
-    fn intersect(&self, ray: Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let e1 = self.p1 - self.p0;
         let e2 = self.p2 - self.p0;
-        let p = ray.direction.cross(e2);
-        let det = e1.dot(p);
+        let p = ray.direction.cross(&e2);
+        let det = e1.dot(&p);
 
         // backface culling
         if let Material::Conductor{..} = self.material {
@@ -96,20 +35,21 @@ impl Primitive for Triangle {
 
         let inv_det = 1.0 / det;
         let t = ray.origin - self.p0;
-        let u = t.dot(p) * inv_det;
+        let u = t.dot(&p) * inv_det;
         if u < 0. || u > 1. { return None }
-        let q = t.cross(e1);
-        let v = ray.direction.dot(q) * inv_det;
+        let q = t.cross(&e1);
+        let v = ray.direction.dot(&q) * inv_det;
         if v < 0. || u + v > 1. { return None }
-        let t = e2.dot(q) * inv_det;
+        let t = e2.dot(&q) * inv_det;
 
 
         if t > f32::EPSILON {
         let intersection = ray.origin + t * ray.direction;
             Some(Intersection {
                 intersection: intersection,
-                normal: self.normal,
-                material: self.material,
+                normal: self.normal, // TODO, normal interpolation
+                // TODO remove material from Intersection
+                material: self.material.clone(),
                 distance: t,
             })
         } else {

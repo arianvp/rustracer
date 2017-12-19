@@ -3,9 +3,9 @@ pub mod sphere;
 pub mod triangle;
 
 use super::ray::Ray;
-use cgmath::{Vector3, Point3};
+use nalgebra::{Vector3, Point3};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum Material { 
     Conductor {
         color: Vector3<f32>,
@@ -19,13 +19,13 @@ pub enum Material {
 }
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Light {
     pub position: Point3<f32>,
     pub intensity: f32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Intersection {
     pub distance: f32, // here for convenience
     pub intersection: Point3<f32>,
@@ -34,5 +34,5 @@ pub struct Intersection {
 }
 
 pub trait Primitive {
-    fn intersect(&self, ray: Ray) ->  Option<Intersection>;
+    fn intersect(&self, ray: &Ray) ->  Option<Intersection>;
 }

@@ -1,4 +1,4 @@
-use cgmath::{Point3, Vector3, ElementWise};
+use nalgebra::{Point3, Vector3};
 use std::path::Path;
 use tracer::primitive::triangle::Triangle;
 use tracer::primitive::Material;
@@ -24,7 +24,7 @@ impl Mesh {
                 .chunks(3)
                 .map(|indices| {
                     Triangle {
-                        material,
+                        material: material.clone(),
                         //material: Material::Conductor{spec:1.0, color:Vector3::new(1.0,0.0,0.0)} ,
                         p0: (positions[indices[0] as usize] * scale) + translation,
                         p1: (positions[indices[1] as usize] * scale) + translation,

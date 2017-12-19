@@ -1,4 +1,4 @@
-use stdsimd::simd::f32x4;
+/*use stdsimd::simd::f32x4;
 use stdsimd::vendor;
 use cgmath::{Vector3, Point3};
 use cgmath::EuclideanSpace;
@@ -52,3 +52,4 @@ pub fn cross(a: f32x4, b: f32x4) -> f32x4 {
         vendor::_mm_mul_ps(vendor::_mm_shuffle_ps(a, a, 0xd2), vendor::_mm_shuffle_ps(b, b, 0xc9)))
     }
 }
+*/
