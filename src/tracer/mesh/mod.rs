@@ -7,6 +7,10 @@ use tracer::primitive::Intersection;
 use std::cmp::Ordering;
 use bvh::ray::Ray;
 use bvh::bvh::BVH;
+use std::fs::File;
+use std::io::BufReader;
+use obj;
+use obj::Obj;
 use tobj;
 
 pub struct Mesh {
@@ -30,6 +34,15 @@ impl Primitive for Mesh {
 
 impl Mesh {
     /// TODO I load simply one scene now
+    ///
+    pub fn load_from_path2(path: &Path) -> Mesh {
+        let file_input =
+            BufReader::new(File::open(path).expect("Failed to open .obj file."));
+        let obj: Obj<Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
+        let mut triangles: Vec<Triangle> = obj.vertices;
+        let bvh = BVH::build(&mut triangles);
+        Mesh { triangles, bvh }
+    }
     pub fn load_from_path(
         path: &Path,
         translation: Vector3<f32>,
@@ -48,6 +61,10 @@ impl Mesh {
             normals.extend(model.mesh.normals);
         }
 
+        println!("indices: {:?}", indices.len());
+        println!("positions: {:?}", positions.len());
+        println!("normals: {:?}", normals.len());
+
         let indices = indices.chunks(3);
         let positions: Vec<_> = positions
             .chunks(3)
@@ -58,17 +75,36 @@ impl Mesh {
             .map(|n| Vector3::new(n[0], n[1], n[2]))
             .collect();
 
+
+
         let mut triangles: Vec<_> = indices
             .map(|indices| {
+                let p0 = (positions[indices[0] as usize] * scale) + translation;
+                let p1 = (positions[indices[1] as usize] * scale) + translation;
+                let p2 = (positions[indices[2] as usize] * scale) + translation;
+                let  n0;
+                let  n1;
+                let  n2;
+
+                if normals.len() == 0 {
+                    n0 = (p1 - p0).cross(&(p1 - p2)).normalize();
+                    n1 = (p1 - p0).cross(&(p1 - p2)).normalize();
+                    n2 = (p1 - p0).cross(&(p1 - p2)).normalize();
+                } else {
+                    n0 = normals[indices[0] as usize];
+                    n1 = normals[indices[1] as usize];
+                    n2 = normals[indices[2] as usize];
+                }
+
                 Triangle {
                     material: material.clone(),
                     //material: Material::Conductor{spec:1.0, color:Vector3::new(1.0,0.0,0.0)} ,
-                    p0: (positions[indices[0] as usize] * scale) + translation,
-                    p1: (positions[indices[1] as usize] * scale) + translation,
-                    p2: (positions[indices[2] as usize] * scale) + translation,
-                    n0: normals[indices[0] as usize], // TODO: normal interpolation!!!!
-                    n1: normals[indices[1] as usize], // TODO: normal interpolation!!!!
-                    n2: normals[indices[2] as usize], // TODO: normal interpolation!!!!
+                    p0,
+                    p1,
+                    p2,
+                    n0,
+                    n1,
+                    n2,
                     node_index: 0,
                 }
             })

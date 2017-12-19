@@ -14,6 +14,7 @@ extern crate scoped_threadpool;
 extern crate stdsimd;
 extern crate half;
 extern crate tobj;
+extern crate obj;
 extern crate morton;
 extern crate rand;
 extern crate bvh;

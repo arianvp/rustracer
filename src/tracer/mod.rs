@@ -81,14 +81,22 @@ fn direct_illumination(
         |accum, light| {
             let mut to_mul = 0.0;
             let origin = intersection;
-            let direction = (light.position - intersection).normalize();
-            let ray = Ray::new(origin + normal * BIAS, direction);
-            /*if normal.dot(direction) >= 0. && !scene.nearest_intersection(ray).is_some() {*/
-            to_mul += brdf(&intersection, &normal, light) / 4.0;
-            /*}*/
-
+            let direction = light.position - intersection;
+            let shadow_value = normal.dot(&direction);
+            if shadow_value >= 0. {
+                let length = direction.norm();
+                let direction = direction.normalize();
+                let ray = Ray::new(origin + normal * BIAS, direction);
+                if let Some(i) = scene.nearest_intersection(&ray) {
+                    if i.distance >= length {
+                        to_mul += brdf(&intersection, &normal, light) / 4.0;
+                    }
+                } else {
+                    to_mul += brdf(&intersection, &normal, light) / 4.0;
+                }
+            }
             accum + (to_mul * color)
-        },
+        }
     )
 }
 

@@ -31,15 +31,15 @@ fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: &Ray) -> Option<In
 
 impl Scene {
     pub fn new() -> Scene {
-        let mesh1 = Mesh::load_from_path(
-            &Path::new("./assets/teapot.obj"),
-            Vector3::new(-0.7, 1.3, 1.1),
+        let mesh1 = Mesh::load_from_path2(
+            &Path::new("./assets/sponza.obj"),
+            /*Vector3::new(-0.7, 1.3, 1.1),
             0.5,
             Material::Conductor {
                 spec: 0.0,
-                color: Vector3::new(0.0, 0.0, 1.0),
-            },
-        ).expect("Error loading");
+                color: Vector3::new(0.8, 0.8, 0.8),
+            },*/
+        );
         let mesh2 = Mesh::load_from_path(
             &Path::new("./assets/cube.obj"),
             Vector3::new(0.5, 1.0, 1.0),
@@ -56,8 +56,8 @@ impl Scene {
             meshes: vec![mesh1],
             lights: vec![
                 Light {
-                    intensity: 9.0,
-                    position: Point3::new(1.0, 3.0, 4.0),
+                    intensity: 12.0,
+                    position: Point3::new(0.0, 1.0, 0.0),
                 },
                 Light {
                     intensity: 5.0,
