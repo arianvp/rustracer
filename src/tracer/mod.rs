@@ -1,6 +1,5 @@
 pub mod camera;
 pub mod primitive;
-pub mod ray;
 pub mod scene;
 pub mod mesh;
 
@@ -15,7 +14,7 @@ use scoped_threadpool::Pool;
 
 use half::f16;
 use self::scene::Scene;
-use self::ray::{Ray};
+use bvh::ray::{Ray};
 use self::camera::Camera;
 use self::primitive::{Light, Material};
 
@@ -83,10 +82,7 @@ fn direct_illumination(
             let mut to_mul = 0.0;
             let origin = intersection;
             let direction = (light.position - intersection).normalize();
-            let ray = Ray {
-                origin: origin + normal * BIAS,
-                direction,
-            };
+            let ray = Ray::new(origin + normal * BIAS, direction);
             /*if normal.dot(direction) >= 0. && !scene.nearest_intersection(ray).is_some() {*/
             to_mul += brdf(&intersection, &normal, light) / 4.0;
             /*}*/
@@ -149,10 +145,7 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
                         direct_illumination(&scene, &i.intersection, &i.normal, &color);
                     let r = reflect(&ray.direction, &i.normal);
                     // TODO break if not specular
-                    let ray = Ray {
-                        origin: i.intersection + biasn,
-                        direction: r,
-                    };
+                    let ray = Ray::new(i.intersection + biasn, r);
                     let reflection = if s == 0. {
                         Vector3::new(0., 0., 0.)
                     } else {
@@ -176,10 +169,7 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
                     let refr_amount = 1.0 - refl_amount;
 
                     let refr = if let Some(dir) = refract(ray.direction, norm_refrac, n1n2) {
-                        let ray = Ray {
-                            origin: i.intersection + bias_refrac,
-                            direction: dir,
-                        };
+                        let ray = Ray::new(i.intersection + bias_refrac, dir);
                         let distance = scene
                             .nearest_intersection(&ray)
                             .map(|x| x.distance)
@@ -198,18 +188,15 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
                         transparency.component_mul(&k)
                     } else {
                         refl_amount = 1.0;
-                        Vector3::zeros()
+                        Vector3::new(0.,0.,0.)
                     };
 
                     let refl = if refl_amount == 0. {
-                        Vector3::zeros()
+                        Vector3::new(0.,0.,0.)
                     } else {
                         trace(
                             &scene,
-                            &Ray {
-                                origin: i.intersection + bias_refrac,
-                                direction: reflect(&ray.direction, &i.normal),
-                            },
+                            &Ray::new(i.intersection + bias_refrac, reflect(&ray.direction, &i.normal)),
                             depth - 1,
                         )
                     };

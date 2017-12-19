@@ -1,5 +1,5 @@
 use nalgebra::{Vector3, Point3};
-use tracer::ray::Ray;
+use bvh::ray::Ray;
 use std::f32;
 use tracer::primitive::{Material, Intersection, Primitive};
 

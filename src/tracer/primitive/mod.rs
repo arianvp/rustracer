@@ -2,7 +2,7 @@ pub mod plane;
 pub mod sphere;
 pub mod triangle;
 
-use super::ray::Ray;
+use bvh::ray::Ray;
 use nalgebra::{Vector3, Point3};
 
 #[derive(Debug, Clone)]

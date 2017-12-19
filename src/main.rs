@@ -16,6 +16,7 @@ extern crate half;
 extern crate tobj;
 extern crate morton;
 extern crate rand;
+extern crate bvh;
 
 mod shaders;
 mod tracer;

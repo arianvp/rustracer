@@ -1,7 +1,7 @@
 use nalgebra::{Point3};
 use std::mem;
 use tracer::primitive::{Material, Intersection, Primitive};
-use tracer::ray::Ray;
+use bvh::ray::Ray;
 
 #[derive(Debug)]
 pub struct Sphere {

@@ -1,9 +1,10 @@
 use nalgebra::{Vector3, Point3};
-use tracer::ray::Ray;
+use bvh::ray::Ray;
 use std::f32;
 use tracer::primitive::{Material, Intersection, Primitive};
 use stdsimd::simd::f32x4;
 use stdsimd::vendor;
+use bvh::aabb::{AABB, Bounded};
 
 #[derive(Debug)]
 pub struct Triangle {
@@ -11,7 +12,9 @@ pub struct Triangle {
     pub p1: Point3<f32>,
     pub p2: Point3<f32>,
     pub material: Material,
-    pub normal: Vector3<f32>,
+    pub n0: Vector3<f32>,
+    pub n1: Vector3<f32>,
+    pub n2: Vector3<f32>,
 }
 
 
@@ -47,7 +50,7 @@ impl Primitive for Triangle {
         let intersection = ray.origin + t * ray.direction;
             Some(Intersection {
                 intersection: intersection,
-                normal: self.normal, // TODO, normal interpolation
+                normal: ((1. - u - v) * self.n0 + u * self.n1 + v * self.n2).normalize(),
                 // TODO remove material from Intersection
                 material: self.material.clone(),
                 distance: t,

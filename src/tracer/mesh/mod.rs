@@ -37,7 +37,9 @@ impl Mesh {
                         p0: (positions[indices[0] as usize] * scale) + translation,
                         p1: (positions[indices[1] as usize] * scale) + translation,
                         p2: (positions[indices[2] as usize] * scale) + translation,
-                        normal: normals[indices[0] as usize], // TODO: normal interpolation!!!!
+                        n0: normals[indices[0] as usize], // TODO: normal interpolation!!!!
+                        n1: normals[indices[1] as usize], // TODO: normal interpolation!!!!
+                        n2: normals[indices[2] as usize], // TODO: normal interpolation!!!!
                     }
                 })
                 .collect(),

@@ -1,6 +1,6 @@
 use nalgebra::{Vector3, Point3};
 use winit::VirtualKeyCode;
-use super::ray::{Ray}; 
+use bvh::ray::{Ray}; 
 use std::f32;
 
 
@@ -126,7 +126,7 @@ impl Camera {
         let target = self.p1 + u * (self.p2 - self.p1) + v * (self.p3 - self.p1);
         let origin = self.origin + self.lens_size * (self.right + self.up);
         let direction = (target - origin).normalize();
-        Ray{origin, direction}
+        Ray::new(origin, direction)
     }
 
     /*pub fn generate4(&self, mortons: [(usize,usize);4]) -> Ray4 {

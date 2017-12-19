@@ -3,7 +3,7 @@ use super::primitive::{Light, Primitive, Material, Intersection};
 use super::primitive::plane::Plane;
 use super::primitive::sphere::Sphere;
 use super::primitive::triangle::Triangle;
-use super::ray::Ray;
+use bvh::ray::Ray;
 use std::cmp::Ordering;
 use super::mesh::Mesh;
 
@@ -32,7 +32,7 @@ fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: &Ray) -> Option<In
 impl Scene {
     pub fn new() -> Scene {
         let mesh1 = Mesh::load_from_path(
-            &Path::new("./assets/cube.obj"),
+            &Path::new("./assets/teapot.obj"),
             Vector3::new(-0.7, 1.3, 1.1),
             0.5,
             Material::Conductor {
@@ -73,17 +73,17 @@ impl Scene {
                         color: Vector3::new(0.3, 1.0, 0.3),
                     },
                 },
-                Plane {
+                /*Plane {
                     p0: Point3::new(0.0, 40.0, 0.0),
                     normal: Vector3::new(0.0, -1.0, 0.0),
                     material: Material::Conductor {
                         spec: 0.0,
                         color: Vector3::new(0.3, 1.0, 0.3),
                     },
-                },
+                },*/
             ],
             spheres: vec![
-                Sphere {
+                /********Sphere {
                     material: Material::Conductor {
                         spec: 0.3,
                         color: Vector3::new(1.0, 0.0, 0.3),
@@ -99,7 +99,7 @@ impl Scene {
                     },
                     position: Point3::new(3.0, 1.0, 0.0),
                     radius: 1.0,
-                },
+                },*/
             ],
         }
     }
