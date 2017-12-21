@@ -6,12 +6,13 @@ use tracer::primitive::Primitive;
 use tracer::primitive::Intersection;
 use std::cmp::Ordering;
 use bvh::ray::Ray;
-use bvh::bvh::BVH;
+use bvh::packed_bvh::BVH;
 use std::fs::File;
 use std::io::BufReader;
 use obj;
 use obj::Obj;
 use tobj;
+use bvh::bounding_hierarchy::{BoundingHierarchy, BHShape};
 
 pub struct Mesh {
     pub triangles: Vec<Triangle>,
@@ -23,7 +24,12 @@ impl Primitive for Mesh {
         let triangles = self.bvh.traverse(ray, &self.triangles);
         triangles
             .iter()
-            .filter_map(|t| t.intersect(ray))
+            .filter_map(|t| t.intersect(ray)/*.map(|i| {
+                let mut j = i;
+                j.depth  = self.bvh.nodes[(*t).bh_node_index()].depth();
+                j
+            })*/)
+            
             .min_by(|a, b| {
                 a.distance.partial_cmp(&b.distance).unwrap_or(
                     Ordering::Equal,
@@ -41,6 +47,8 @@ impl Mesh {
         let obj: Obj<Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
         let mut triangles: Vec<Triangle> = obj.vertices;
         let bvh = BVH::build(&mut triangles);
+
+        println!("Built BVH");
         Mesh { triangles, bvh }
     }
     pub fn load_from_path(

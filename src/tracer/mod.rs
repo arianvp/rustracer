@@ -18,6 +18,7 @@ use bvh::ray::{Ray};
 use self::camera::Camera;
 use self::primitive::{Light, Material};
 
+use palette;
 
 struct Morton(*mut [f16; 4]);
 
@@ -140,6 +141,9 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
     match scene.nearest_intersection(ray) {
         None => Vector3::new(0.1, 0.1, 1.0),
         Some(i) => {
+            if i.depth != 0 {
+                return Vector3::new(0.0, (0.5 - 1.0 / i.depth as f32), 0.0);
+            }
             let biasn = BIAS * i.normal;
             match i.material {
                 Material::Conductor { spec, color } => {

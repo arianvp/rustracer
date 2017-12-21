@@ -53,7 +53,7 @@ impl FromRawVertex for Triangle {
                         n0: -normal,
                         n1: -normal,
                         n2: -normal,
-                        material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.8, 0.8, 0.8)},
+                        material: Material::Conductor{ spec: 0.2, color: Vector3::new(0.8, 0.8, 0.8)},
                         node_index: 0, 
 
                     });
@@ -133,6 +133,7 @@ impl Primitive for Triangle {
                 // TODO remove material from Intersection
                 material: self.material.clone(),
                 distance: t,
+                depth: 0,
             })
         } else {
             None

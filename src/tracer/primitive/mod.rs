@@ -31,6 +31,7 @@ pub struct Intersection {
     pub intersection: Point3<f32>,
     pub normal: Vector3<f32>,
     pub material: Material,
+    pub depth: u32,
 }
 
 pub trait Primitive {

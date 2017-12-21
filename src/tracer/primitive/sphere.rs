@@ -41,6 +41,7 @@ impl Primitive for Sphere {
             normal,
             intersection: intersection,
             distance: t0,
+            depth: 0,
         })
     }
 }

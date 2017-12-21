@@ -24,6 +24,7 @@ impl Primitive for Plane {
                     normal: self.normal,
                     distance,
                     intersection: ray.origin + (distance * ray.direction),
+                    depth: 0,
                 })
             } else {
                 None
