@@ -19,12 +19,8 @@ extern crate morton;
 extern crate rand;
 extern crate bvh;
 
-
-extern crate palette;
-
 mod shaders;
 mod tracer;
-mod vec;
 
 use scoped_threadpool::Pool;
 use std::mem;

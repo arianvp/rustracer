@@ -18,7 +18,6 @@ use bvh::ray::{Ray};
 use self::camera::Camera;
 use self::primitive::{Light, Material};
 
-use palette;
 
 struct Morton(*mut [f16; 4]);
 
