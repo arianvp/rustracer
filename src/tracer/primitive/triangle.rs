@@ -1,11 +1,12 @@
 use nalgebra::{Vector3, Point3};
 use bvh::ray::Ray;
 use std::f32;
-use tracer::primitive::{Material, Intersection, Primitive};
+use tracer::primitive::{Material, Primitive, HitData};
 use stdsimd::simd::f32x4;
 use stdsimd::vendor;
 use bvh::aabb::{AABB, Bounded};
 use bvh::bounding_hierarchy::{BoundingHierarchy, BHShape};
+use bvh::ray::Intersection;
 use obj::*;
 use obj::raw::object::Polygon;
 
@@ -53,7 +54,7 @@ impl FromRawVertex for Triangle {
                         n0: -normal,
                         n1: -normal,
                         n2: -normal,
-                        material: Material::Conductor{ spec: 0.2, color: Vector3::new(0.8, 0.8, 0.8)},
+                        material: Material::Conductor{ spec: 0.0, color: Vector3::new(0.8, 0.8, 0.8)},
                         node_index: 0, 
 
                     });
@@ -94,11 +95,8 @@ impl BHShape for Triangle {
     fn bh_node_index(&self) -> usize {
         self.node_index
     }
-}
 
-
-impl Primitive for Triangle {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray) -> Intersection {
         let e1 = self.p1 - self.p0;
         let e2 = self.p2 - self.p0;
         let p = ray.direction.cross(&e2);
@@ -107,37 +105,46 @@ impl Primitive for Triangle {
         // backface culling
         if let Material::Conductor{..} = self.material {
             if det < f32::EPSILON {
-                return None
+                return Intersection::new(f32::INFINITY, 0., 0.)
             }
         }
 
         if (det > -f32::EPSILON && det < f32::EPSILON) {
-            return None
+            return Intersection::new(f32::INFINITY, 0., 0.)
         }
 
         let inv_det = 1.0 / det;
-        let t = ray.origin - self.p0;
+        let t = ray.origin() - self.p0;
         let u = t.dot(&p) * inv_det;
-        if u < 0. || u > 1. { return None }
+        if u < 0. || u > 1. { 
+            return Intersection::new(f32::INFINITY, 0., 0.)
+        }
+
         let q = t.cross(&e1);
         let v = ray.direction.dot(&q) * inv_det;
-        if v < 0. || u + v > 1. { return None }
+        if v < 0. || u + v > 1. {
+            return Intersection::new(f32::INFINITY, u, v)
+        }
         let t = e2.dot(&q) * inv_det;
 
 
         if t > f32::EPSILON {
-        let intersection = ray.origin + t * ray.direction;
-            Some(Intersection {
-                intersection: intersection,
-                normal: ((1. - u - v) * self.n0 + u * self.n1 + v * self.n2).normalize(),
-                // TODO remove material from Intersection
-                material: self.material.clone(),
-                distance: t,
-                depth: 0,
-            })
+            Intersection::new(t, u, v)
         } else {
-            None
+            Intersection::new(f32::INFINITY, u, v)
         }
 
+    }
+}
+
+
+impl Primitive for Triangle {
+    fn get_hit_data(&self, intersection: &Intersection) -> HitData {
+        let u = intersection.u;
+        let v = intersection.v;
+        HitData {
+            normal: ((1. - u - v) * self.n0 + u * self.n1 + v * self.n2).normalize(),
+            material: self.material.clone(),
+        }
     }
 }

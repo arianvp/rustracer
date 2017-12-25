@@ -10,7 +10,7 @@ pub struct Plane {
     pub normal: Vector3<f32>,
 }
 
-impl Primitive for Plane {
+/*impl Primitive for Plane {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         // TODO: not sure why I take the negative here. but it works?
         let denom = -self.normal.dot(&ray.direction);
@@ -33,5 +33,5 @@ impl Primitive for Plane {
             None
         }
     }
-}
+}*/
 

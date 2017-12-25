@@ -10,7 +10,8 @@ pub struct Sphere {
     pub material: Material,
 }
 
-impl Primitive for Sphere {
+// will reintroduce after refactor
+/*impl Primitive for Sphere {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let distance = self.position - ray.origin;
         let tca = distance.dot(&ray.direction);
@@ -44,4 +45,4 @@ impl Primitive for Sphere {
             depth: 0,
         })
     }
-}
+}*/

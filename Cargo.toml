@@ -25,4 +25,5 @@ path = "../bvh"
 [profile.release]
 debug = true
 opt-level = 3
+lto = true
 

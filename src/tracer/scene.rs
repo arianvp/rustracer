@@ -1,9 +1,9 @@
 use nalgebra::{Vector3, Point3};
-use super::primitive::{Light, Primitive, Material, Intersection};
+use super::primitive::{Light, Primitive, Material};
 use super::primitive::plane::Plane;
 use super::primitive::sphere::Sphere;
 use super::primitive::triangle::Triangle;
-use bvh::ray::Ray;
+use bvh::ray::{Ray, Intersection};
 use std::cmp::Ordering;
 use super::mesh::Mesh;
 
@@ -11,12 +11,12 @@ use std::path::Path;
 
 pub struct Scene {
     pub lights: Vec<Light>,
-    pub planes: Vec<Plane>,
-    pub spheres: Vec<Sphere>,
+   // pub planes: Vec<Plane>,
+   // pub spheres: Vec<Sphere>,
     pub meshes: Vec<Mesh>,
 }
 
-
+/*
 #[inline]
 fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: &Ray) -> Option<Intersection> {
     primitives.iter().filter_map(|p| p.intersect(ray)).min_by(
@@ -26,13 +26,13 @@ fn nearest_intersection_<T: Primitive>(primitives: &[T], ray: &Ray) -> Option<In
             )
         },
     )
-}
+}*/
 
 
 impl Scene {
     pub fn new() -> Scene {
         let mesh1 = Mesh::load_from_path2(
-            &Path::new("./assets/teapot.obj"),
+            &Path::new("./assets/sponza.obj"),
             /*Vector3::new(-0.7, 1.3, 1.1),
             0.5,
             Material::Conductor {
@@ -54,26 +54,27 @@ impl Scene {
                     position: Point3::new(1.0, 3.0, -4.0),
                 },
             ],
+            /*
             planes: vec![
-                /*Plane {
+                Plane {
                     p0: Point3::new(0.0, 0.0, 0.0),
                     normal: Vector3::new(0.0, 1.0, 0.0),
                     material: Material::Conductor {
                         spec: 0.0,
                         color: Vector3::new(0.3, 1.0, 0.3),
                     },
-                },*/
-                /*Plane {
+                },
+                Plane {
                     p0: Point3::new(0.0, 40.0, 0.0),
                     normal: Vector3::new(0.0, -1.0, 0.0),
                     material: Material::Conductor {
                         spec: 0.0,
                         color: Vector3::new(0.3, 1.0, 0.3),
                     },
-                },*/
+                },
             ],
             spheres: vec![
-                /*Sphere {
+                Sphere {
                     material: Material::Dielectric {
                         n1: 1.0,
                         n2: 1.21,
@@ -90,17 +91,19 @@ impl Scene {
                     },
                     position: Point3::new(3.0, 1.0, 0.0),
                     radius: 1.0,
-                },*/
-            ],
+                },
+            ],*/
         }
     }
 
-    pub fn nearest_intersection(&self, ray: &Ray) -> Option<Intersection> {
+    pub fn nearest_intersection(&self, ray: &Ray) -> Option<(&Triangle,Intersection)> {
         // we iterate over each of the primitives together for more cache coherence
         //let plane = nearest_intersection_(&self.planes, ray);
         //let sphere = nearest_intersection_(&self.spheres, ray);
-        let mesh = nearest_intersection_(&self.meshes, ray);
-        return mesh;
+        //let mesh = nearest_intersection_(&self.meshes, ray);
+        //return mesh;
+
+        self.meshes[0].intersect(ray)
 
         /*let mut nearest = None;
         for y in [plane, sphere, mesh].iter() {

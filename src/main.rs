@@ -53,7 +53,7 @@ fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
     let events_loop = EventsLoop::new();
     let window = WindowBuilder::new()
         .with_decorations(true)
-        .with_dimensions(1024, 1024)
+        .with_dimensions(512, 512)
         .build_vk_surface(&events_loop, instance.clone())
         .expect("failed to build window");
     (events_loop, window)
@@ -89,8 +89,8 @@ fn get_device(physical: &PhysicalDevice, window: &Window) -> (Arc<Device>, Arc<Q
 
 
 
-const WIDTH: usize = 1024;
-const HEIGHT: usize = 1024;
+const WIDTH: usize = 512;
+const HEIGHT: usize = 512;
 fn main() {
     // find an instance of Vulkan that allows us to draw to a surface
     let instance = Instance::new(None, &vulkano_win::required_extensions(), None)
@@ -105,7 +105,7 @@ fn main() {
     let (device, queue) = get_device(&physical, &window);
 
     // find a device with a swapchain
-    let mut dimensions = [1024, 768];
+    let mut dimensions = [512, 512];
 
     let (mut swapchain, mut images) = {
         let caps = window
@@ -393,7 +393,7 @@ fn main() {
             AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
 
         let compute_command_buffer_builder = if gpu {
-            compute_command_buffer_builder.dispatch([1024 / 8, 1024 / 8, 1], compute_pipeline.clone(), compute_set.clone(), ()).unwrap()
+            compute_command_buffer_builder.dispatch([512 / 8, 512 / 8, 1], compute_pipeline.clone(), compute_set.clone(), ()).unwrap()
         } else {
             compute_command_buffer_builder
         };

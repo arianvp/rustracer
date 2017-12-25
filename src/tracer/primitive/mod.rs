@@ -2,7 +2,8 @@ pub mod plane;
 pub mod sphere;
 pub mod triangle;
 
-use bvh::ray::Ray;
+use bvh::ray::{Ray, Intersection};
+use bvh::bounding_hierarchy::BHShape;
 use nalgebra::{Vector3, Point3};
 
 #[derive(Debug, Clone)]
@@ -25,15 +26,11 @@ pub struct Light {
     pub intensity: f32,
 }
 
-#[derive(Debug, Clone)]
-pub struct Intersection {
-    pub distance: f32, // here for convenience
-    pub intersection: Point3<f32>,
-    pub normal: Vector3<f32>,
+pub struct HitData {
     pub material: Material,
-    pub depth: u32,
+    pub normal: Vector3<f32>,
 }
 
-pub trait Primitive {
-    fn intersect(&self, ray: &Ray) ->  Option<Intersection>;
+pub trait Primitive : BHShape {
+    fn get_hit_data(&self, intersection: &Intersection) -> HitData; 
 }

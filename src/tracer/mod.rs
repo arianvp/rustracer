@@ -16,7 +16,7 @@ use half::f16;
 use self::scene::Scene;
 use bvh::ray::{Ray};
 use self::camera::Camera;
-use self::primitive::{Light, Material};
+use self::primitive::{Light, Material, Primitive};
 
 
 struct Morton(*mut [f16; 4]);
@@ -87,7 +87,7 @@ fn direct_illumination(
                 let length = direction.norm();
                 let direction = direction.normalize();
                 let ray = Ray::new(origin + normal * BIAS, direction);
-                if let Some(i) = scene.nearest_intersection(&ray) {
+                if let Some((_,i)) = scene.nearest_intersection(&ray) {
                     if i.distance >= length {
                         to_mul += brdf(&intersection, &normal, light) / 4.0;
                     }
@@ -139,24 +139,26 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
     }
     match scene.nearest_intersection(ray) {
         None => Vector3::new(0.1, 0.1, 1.0),
-        Some(i) => {
-            if i.depth != 0 {
-                return Vector3::new(0.0, (0.5 - 1.0 / i.depth as f32), 0.0);
+        Some((shape, i)) => {
+            if i.distance >= f32::INFINITY {
+                return Vector3::new(0.1, 0.1, 1.0)
             }
-            let biasn = BIAS * i.normal;
-            match i.material {
+            let hit_data = shape.get_hit_data(&i);
+            let biasn = BIAS * hit_data.normal;
+            let intersection = ray.origin() + i.distance * ray.direction;
+            match hit_data.material {
                 Material::Conductor { spec, color } => {
                     let s = if spec == 0.0 {
                         0.0
                     } else {
-                        schlick(&ray.direction, &i.normal, spec)
+                        schlick(&ray.direction, &hit_data.normal, spec)
                     };
                     let d = 1.0 - s;
                     let refraction = d *
-                        direct_illumination(&scene, &i.intersection, &i.normal, &color);
-                    let r = reflect(&ray.direction, &i.normal);
+                        direct_illumination(&scene, &intersection, &hit_data.normal, &color);
+                    let r = reflect(&ray.direction, &hit_data.normal);
                     // TODO break if not specular
-                    let ray = Ray::new(i.intersection + biasn, r);
+                    let ray = Ray::new(intersection + biasn, r);
                     let reflection = if s == 0. {
                         Vector3::new(0., 0., 0.)
                     } else {
@@ -165,13 +167,13 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
                     reflection + refraction
                 }
                 Material::Dielectric { absorbance, n1, n2 } => {
-                    let outside = ray.direction.dot(&i.normal) < 0.0;
+                    let outside = ray.direction.dot(&hit_data.normal) < 0.0;
                     let mut n1 = n1;
                     let mut n2 = n2;
                     if !outside {
                         mem::swap(&mut n1, &mut n2)
                     }
-                    let norm_refrac = if outside { i.normal } else { -i.normal };
+                    let norm_refrac = if outside { hit_data.normal } else { -hit_data.normal };
                     let bias_refrac = if outside { -biasn } else { biasn };
                     let n1n2 = n1 / n2;
 
@@ -180,10 +182,10 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
                     let refr_amount = 1.0 - refl_amount;
 
                     let refr = if let Some(dir) = refract(ray.direction, norm_refrac, n1n2) {
-                        let ray = Ray::new(i.intersection + bias_refrac, dir);
+                        let ray = Ray::new(intersection + bias_refrac, dir);
                         let distance = scene
                             .nearest_intersection(&ray)
-                            .map(|x| x.distance)
+                            .map(|x| x.1.distance)
                             .unwrap_or(0.0);
                         let absorbance = absorbance * -distance;
                         let transparency = if outside {
@@ -207,7 +209,7 @@ fn trace(scene: &Scene, ray: &Ray, depth: u32) -> Vector3<f32> {
                     } else {
                         trace(
                             &scene,
-                            &Ray::new(i.intersection + bias_refrac, reflect(&ray.direction, &i.normal)),
+                            &Ray::new(intersection + bias_refrac, reflect(&ray.direction, &hit_data.normal)),
                             depth - 1,
                         )
                     };

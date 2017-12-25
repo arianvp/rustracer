@@ -3,9 +3,8 @@ use std::path::Path;
 use tracer::primitive::triangle::Triangle;
 use tracer::primitive::Material;
 use tracer::primitive::Primitive;
-use tracer::primitive::Intersection;
 use std::cmp::Ordering;
-use bvh::ray::Ray;
+use bvh::ray::{Ray, Intersection};
 use bvh::packed_bvh::BVH;
 use std::fs::File;
 use std::io::BufReader;
@@ -19,9 +18,11 @@ pub struct Mesh {
     pub bvh: BVH,
 }
 
-impl Primitive for Mesh {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let triangles = self.bvh.traverse(ray, &self.triangles);
+
+impl Mesh {
+    pub fn intersect(&self, ray: &Ray) -> Option<(&Triangle, Intersection)> {
+        self.bvh.intersect(ray, &self.triangles)
+        /*let triangles = self.bvh.traverse(ray, &self.triangles);
         triangles
             .iter()
             .filter_map(|t| t.intersect(ray)/*.map(|i| {
@@ -34,11 +35,8 @@ impl Primitive for Mesh {
                 a.distance.partial_cmp(&b.distance).unwrap_or(
                     Ordering::Equal,
                 )
-            })
+            })*/
     }
-}
-
-impl Mesh {
     /// TODO I load simply one scene now
     ///
     pub fn load_from_path2(path: &Path) -> Mesh {
