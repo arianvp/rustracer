@@ -32,7 +32,7 @@ fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
     let events_loop = EventsLoop::new();
     let window = WindowBuilder::new()
         .with_decorations(true)
-        .with_dimensions(512, 512)
+        .with_dimensions(1024, 512)
         .build_vk_surface(&events_loop, instance.clone())
         .expect("failed to build window");
     (events_loop, window)
@@ -92,9 +92,7 @@ fn main() {
 
     let uniform_pool = CpuBufferPool::uniform_buffer(device.clone());
 
-    let mut tick = 0;
     loop {
-        tick += 1;
         previous_frame_end.cleanup_finished();
 
         if graphics.recreate_swapchain(&window) {
@@ -113,9 +111,11 @@ fn main() {
 
         let uniform = Arc::new(uniform_pool.next(
             tracer::ty::Input {
-                center: [-0.25, 0.024286693904085032],
-                iter: 200,
-                scale: 1.0  / (tick as f32 * 0.05),
+                camera: tracer::ty::Camera {
+                    dummy: 0,
+                },
+                samples_per_pixel: 0,
+                _dummy0: [0; 12],
             }
         ).unwrap());
 

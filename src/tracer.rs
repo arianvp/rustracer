@@ -7,10 +7,15 @@
 layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(set = 0, binding = 0, rgba8) uniform writeonly image2D img;
+
+struct Camera {
+  uint dummy;
+};
+
 layout(set = 0, binding = 1) uniform readonly Input {
-    vec2 center;
-    float scale;
-    int iter;
+  Camera camera;
+  uint samples_per_pixel;
+
 };
 
 struct Sphere {
