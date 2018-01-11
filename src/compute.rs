@@ -1,26 +1,27 @@
 
 extern crate vulkano;
-use vulkano::descriptor::descriptor_set;
-
+use tracer;
 use std::sync::Arc;
+use vulkano::buffer::BufferAccess;
+use vulkano::command_buffer::AutoCommandBufferBuilder;
+use vulkano::descriptor::descriptor_set::DescriptorSet;
+use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
+use vulkano::device::Device;
+use vulkano::image::traits::ImageViewAccess;
+use vulkano::pipeline::ComputePipeline;
+use vulkano::pipeline::ComputePipelineAbstract;
 
-
-use shaders::mandelbrot::cs;
-
-pub struct ComputePart<I: 'static + vulkano::image::traits::ImageViewAccess + Send + Sync> {
-    pipeline: Arc<vulkano::pipeline::ComputePipelineAbstract + Send + Sync>,
+pub struct ComputePart<I: 'static + ImageViewAccess + Send + Sync> {
+    pipeline: Arc<ComputePipelineAbstract + Send + Sync>,
     image: Arc<I>,
 }
 
-impl<I: 'static + vulkano::image::traits::ImageViewAccess + Send + Sync> ComputePart<I> {
-    pub fn new(device: &Arc<vulkano::device::Device>, image: Arc<I>) -> ComputePart<I> {
-        let shader = cs::Shader::load(device.clone()).expect("failed to create shader module");
+impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
+    pub fn new(device: &Arc<Device>, image: Arc<I>) -> ComputePart<I> {
+        let shader = tracer::Shader::load(device.clone()).expect("failed to create shader module");
         let pipeline = Arc::new(
-            vulkano::pipeline::ComputePipeline::new(
-                device.clone(),
-                &shader.main_entry_point(),
-                &(),
-            ).expect("failed to create compute pipeline"),
+            ComputePipeline::new(device.clone(), &shader.main_entry_point(), &())
+                .expect("failed to create compute pipeline"),
         );
 
         ComputePart {
@@ -31,10 +32,10 @@ impl<I: 'static + vulkano::image::traits::ImageViewAccess + Send + Sync> Compute
 
     pub fn render(
         &mut self,
-        builder: vulkano::command_buffer::AutoCommandBufferBuilder,
+        builder: AutoCommandBufferBuilder,
         dimensions: [u32; 2],
-        uniform: Arc<vulkano::buffer::BufferAccess + Send + Sync + 'static>,
-    ) -> vulkano::command_buffer::AutoCommandBufferBuilder {
+        uniform: Arc<BufferAccess + Send + Sync + 'static>,
+    ) -> AutoCommandBufferBuilder {
         builder.dispatch([dimensions[0] / 16, dimensions[1] / 16, 1],
                       self.pipeline.clone(),
                       self.next_set(uniform.clone()),
@@ -44,10 +45,10 @@ impl<I: 'static + vulkano::image::traits::ImageViewAccess + Send + Sync> Compute
 
     fn next_set(
         &mut self,
-        uniform: Arc<vulkano::buffer::BufferAccess + Send + Sync>,
-    ) -> Arc<vulkano::descriptor::descriptor_set::DescriptorSet + Send + Sync> {
+        uniform: Arc<BufferAccess + Send + Sync>,
+    ) -> Arc<DescriptorSet + Send + Sync> {
         Arc::new(
-            descriptor_set::PersistentDescriptorSet::start(self.pipeline.clone(), 0)
+            PersistentDescriptorSet::start(self.pipeline.clone(), 0)
                 .add_image(self.image.clone())
                 .unwrap()
                 .add_buffer(uniform)

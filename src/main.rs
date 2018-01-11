@@ -13,7 +13,7 @@ extern crate scoped_threadpool;
 
 extern crate half;
 
-mod shaders;
+mod tracer;
 mod types;
 mod graphics;
 mod compute;
@@ -92,7 +92,9 @@ fn main() {
 
     let uniform_pool = CpuBufferPool::uniform_buffer(device.clone());
 
+    let mut tick = 0;
     loop {
+        tick += 1;
         previous_frame_end.cleanup_finished();
 
         if graphics.recreate_swapchain(&window) {
@@ -110,10 +112,10 @@ fn main() {
         };
 
         let uniform = Arc::new(uniform_pool.next(
-            shaders::mandelbrot::cs::ty::Input {
-                center: [1.0, 0.0],
+            tracer::ty::Input {
+                center: [-0.25, 0.024286693904085032],
                 iter: 200,
-                scale: 1.0,
+                scale: 1.0  / (tick as f32 * 0.05),
             }
         ).unwrap());
 
