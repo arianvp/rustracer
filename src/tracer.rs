@@ -165,6 +165,10 @@ Ray generate_ray(vec2 uv) {
 }
 
 void main() {
+
+    // clear the screen. Later on only
+    imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
+
     uint seed = wang_hash(wang_hash(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * imageSize(img).x));
     float val = seed * (1.0 / 4294967269.0);
 
