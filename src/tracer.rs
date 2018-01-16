@@ -78,8 +78,33 @@ bool intersects_aabb(Ray ray, AABB aabb) {
   return false;
 }
 
-float intersects_triangle(Ray ray, Triangle triangle) {
-  return 0.0;
+float intersects_sphere(Ray ray, Sphere sphere) {
+  vec3 distance = sphere.position - ray.origin;
+  float tca = dot(distance, ray.direction);
+  if (tca < 0.0) {
+    return 1.0 / 0.0;
+  }
+  float  d2 = dot(distance, distance) - tca * tca;
+  float r2 = sphere.radius * sphere.radius;
+  if (d2 > r2) {
+    return 1.0 / 0.0;
+  }
+
+  float thc = sqrt(r2 - d2);
+  float t0 = tca - thc;
+  float t1 = tca + thc;
+  if (t0 > t1) {
+    float temp = t0;
+    t0 = t1;
+    t1 = temp;
+  }
+  if (t0 < 0.0) {
+    t0 = t1;
+    if (t0 < 0.0) {
+      return 1.0 / 0.0;
+    }
+  }
+  return t0;
 }
 
 /*float intersect_scene(Ray ray) {
