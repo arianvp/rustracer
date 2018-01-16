@@ -215,10 +215,7 @@ impl GraphicsPart {
 
     pub fn acquire_next_image(
         &mut self,
-    ) -> Result<
-        (usize, vulkano::swapchain::SwapchainAcquireFuture),
-        vulkano::swapchain::AcquireError,
-    > {
+    ) -> Result<(usize, vulkano::swapchain::SwapchainAcquireFuture), vulkano::swapchain::AcquireError> {
         match vulkano::swapchain::acquire_next_image(self.swapchain.clone(), None) {
             Ok(r) => Ok(r),
             Err(vulkano::swapchain::AcquireError::OutOfDate) => {
@@ -305,7 +302,6 @@ void main()
 pub mod fs {
     #[derive(VulkanoShader)]
     #[ty = "fragment"]
-
     #[src = "
 
 #version 450
