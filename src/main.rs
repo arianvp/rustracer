@@ -93,14 +93,16 @@ fn main() {
             radius: 0.5,
         },
         tracer::ty::Sphere {
-            position: [0.0; 3],
+            position: [0.4; 3],
             radius: 0.5,
         },
         tracer::ty::Sphere {
-            position: [0.0; 3],
+            position: [0.6; 3],
             radius: 0.5,
         },
     ];
+
+    let num_spheres = spheres.len() as u32;
 
     let mut compute = compute::ComputePart::new(&device, graphics.texture.clone(), spheres);
 
@@ -133,7 +135,7 @@ fn main() {
             let mut cbb =
                 AutoCommandBufferBuilder::primary_one_time_submit(device.clone(), queue.family())
                     .unwrap();
-            cbb = compute.render(cbb, graphics.dimensions, tracer::ty::Input { camera });
+            cbb = compute.render(cbb, graphics.dimensions, tracer::ty::Input { camera , num_spheres });
             cbb = graphics.draw(cbb, image_num);
             cbb.end_render_pass().unwrap().build().unwrap()
         };

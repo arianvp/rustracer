@@ -57,6 +57,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 layout(        set = 0, binding = 0, rgba8) uniform writeonly image2D img;
 layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   Camera camera;
+  uint num_spheres;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 //layout(std140, set = 0, binding = 3) buffer Positions { vec3   positions[]; };
@@ -73,6 +74,31 @@ layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
   triangle.p3 = positions[indices[idx].z];
   return triangle;
 }*/
+
+/*float intersect_scene(Ray ray) {
+  uint idx = 0;
+  uint max_length = node_length;
+  float best_time = 1.0 / 0.0;
+  while (idx < max_length) {
+    Node node = nodes[idx];
+    if (node.entry_index == MAX_VALUE) { // leaf node
+      Triangle triangle = get_triangle(node.shape_index);
+      idx = node.exit_index;
+      if (intersects_aabb(ray, node.aabb)) {
+        float time = intersects_triangle(ray, triangle);
+        if (time < best_time) {
+          best_time = time;
+        }
+      }
+    } else if (intersects_aabb(ray, node.aabb)) { // intersects internal node
+      idx = node.entry_index;
+    } else {
+      idx = node.exit_index;
+    }
+  }
+  return best_time;
+}*/
+
 
 bool intersects_aabb(Ray ray, AABB aabb) {
   return false;
@@ -106,30 +132,6 @@ float intersects_sphere(Ray ray, Sphere sphere) {
   }
   return t0;
 }
-
-/*float intersect_scene(Ray ray) {
-  uint idx = 0;
-  uint max_length = node_length;
-  float best_time = 1.0 / 0.0;
-  while (idx < max_length) {
-    Node node = nodes[idx];
-    if (node.entry_index == MAX_VALUE) { // leaf node
-      Triangle triangle = get_triangle(node.shape_index);
-      idx = node.exit_index;
-      if (intersects_aabb(ray, node.aabb)) {
-        float time = intersects_triangle(ray, triangle);
-        if (time < best_time) {
-          best_time = time;
-        }
-      }
-    } else if (intersects_aabb(ray, node.aabb)) { // intersects internal node
-      idx = node.entry_index;
-    } else {
-      idx = node.exit_index;
-    }
-  }
-  return best_time;
-}*/
 
 uint wang_hash(uint seed) {
   seed = (seed ^ 61) ^ (seed >> 16);
@@ -169,7 +171,21 @@ void main() {
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
     Ray ray = generate_ray(uv);
 
-    imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(ray.direction), 1.0));
+    uint best_i;
+    uint i;
+    float t  = 1.0 / 0.0;
+    for (i = 0; i < num_spheres; i++) {
+      float t_new = intersects_sphere(ray, spheres[i]);
+      if (t_new < t) { t = t_new; best_i = i; }
+    }
+
+    if (t < 1.0 / 0.0) {
+      vec3 intersection = ray.origin + ray.direction * t;
+      vec3 normal = normalize(intersection - spheres[best_i].position);
+      
+      imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(normal, 1.0));
+    }
+
 }
 "]
 #[allow(dead_code)]
