@@ -86,18 +86,28 @@ fn main() {
 
 
 
-        // TODO we should probably arc this?
+    // TODO we should probably arc this?
     let spheres = vec![
-        tracer::ty::Sphere { position: [0.0; 3], radius: 0.5 },
-        tracer::ty::Sphere { position: [0.0; 3], radius: 0.5 },
-        tracer::ty::Sphere { position: [0.0; 3], radius: 0.5 },
+        tracer::ty::Sphere {
+            position: [0.0; 3],
+            radius: 0.5,
+        },
+        tracer::ty::Sphere {
+            position: [0.0; 3],
+            radius: 0.5,
+        },
+        tracer::ty::Sphere {
+            position: [0.0; 3],
+            radius: 0.5,
+        },
     ];
 
     let mut compute = compute::ComputePart::new(&device, graphics.texture.clone(), spheres);
 
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
-    let mut camera = tracer::ty::Camera::new(Vector3::new(0.,3.,5.), Vector3::new(0.,0.,0.), 20.);
+    let mut camera =
+        tracer::ty::Camera::new(Vector3::new(0., 3., 5.), Vector3::new(0., 0., 0.), 20.);
 
 
 
@@ -144,7 +154,7 @@ fn main() {
                 Event::WindowEvent { event, .. } => {
                     match event {
                         WindowEvent::Resized(_width, _height) => graphics.recreate_swapchain = true,
-                        WindowEvent::KeyboardInput { input ,.. } => {
+                        WindowEvent::KeyboardInput { input, .. } => {
                             camera.handle_input(input.virtual_keycode.unwrap());
                         }
                         _ => {}
