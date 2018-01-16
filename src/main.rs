@@ -90,6 +90,8 @@ fn main() {
 
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
+    let mut camera = tracer::ty::Camera::new(Vector3::new(0.,3.,5.), Vector3::new(0.,0.,0.), 20.);
+
 
     loop {
         previous_frame_end.cleanup_finished();
@@ -113,9 +115,7 @@ fn main() {
             let mut cbb =
                 AutoCommandBufferBuilder::primary_one_time_submit(device.clone(), queue.family())
                     .unwrap();
-            cbb = compute.render(cbb, graphics.dimensions, tracer::ty::Input {
-                camera: tracer::ty::Camera::new(Vector3::new(0.,3.,5.), Vector3::new(0.,0.,0.), 20.),
-            });
+            cbb = compute.render(cbb, graphics.dimensions, tracer::ty::Input { camera });
             cbb = graphics.draw(cbb, image_num);
             cbb.end_render_pass().unwrap().build().unwrap()
         };
@@ -136,7 +136,9 @@ fn main() {
                 Event::WindowEvent { event, .. } => {
                     match event {
                         WindowEvent::Resized(_width, _height) => graphics.recreate_swapchain = true,
-                        WindowEvent::KeyboardInput { .. } => {}
+                        WindowEvent::KeyboardInput { input ,.. } => {
+                            camera.handle_input(input.virtual_keycode.unwrap());
+                        }
                         _ => {}
                     }
                 }
