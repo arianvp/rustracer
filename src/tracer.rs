@@ -58,7 +58,7 @@ layout(        set = 0, binding = 0, rgba8) uniform writeonly image2D img;
 layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   Camera camera;
 };
-//layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
+layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 //layout(std140, set = 0, binding = 3) buffer Positions { vec3   positions[]; };
 //layout(std140, set = 0, binding = 4) buffer Indices   { uvec3  indices[];   };
 //layout(std140, set = 0, binding = 5) buffer BVH       { Node   nodes[];     };
