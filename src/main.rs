@@ -92,20 +92,41 @@ fn main() {
         tracer::ty::Sphere {
             position: [0.0; 3],
             radius: 0.5,
+            material: tracer::ty::Material {
+                diffuse: [0.3, 0.2, 0.3],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0;8],
+            },
+            _dummy0: [0;4],
         },
         tracer::ty::Sphere {
             position: [0.4; 3],
             radius: 0.5,
+            material: tracer::ty::Material {
+                diffuse: [0.3, 0.2, 0.3],
+                refl: 0.2,
+                emissive: 0,
+                _dummy0: [0;8],
+            },
+            _dummy0: [0;4],
         },
         tracer::ty::Sphere {
             position: [0.6; 3],
             radius: 0.5,
+            material: tracer::ty::Material {
+                diffuse: [0.3, 0.2, 0.3],
+                refl: 0.0,
+                emissive: 1,
+                _dummy0: [0;8],
+            },
+            _dummy0: [0;4],
         },
     ];
 
     let num_spheres = spheres.len() as u32;
 
-    let mut compute = compute::ComputePart::new(&device, graphics.texture.clone(), spheres);
+    let mut compute = compute::ComputePart::new(&device, graphics.texture.clone(), spheres, queue.family());
 
 
 
@@ -115,8 +136,10 @@ fn main() {
         tracer::ty::Camera::new(Vector3::new(0., 3., 5.), Vector3::new(0., 0., 0.), 20.);
 
     let mut keycodes = HashSet::new();
+    let mut spp = -1;
 
     loop {
+        spp += 1;
         previous_frame_end.cleanup_finished();
 
         if graphics.recreate_swapchain(&window) {
@@ -144,6 +167,7 @@ fn main() {
                 tracer::ty::Input {
                     camera,
                     num_spheres,
+                    spp,
                 },
             );
             cbb = graphics.draw(cbb, image_num);
@@ -155,7 +179,6 @@ fn main() {
             .then_swapchain_present(queue.clone(), graphics.swapchain.clone(), image_num)
             .then_signal_fence_and_flush().unwrap();
         previous_frame_end = Box::new(future) as Box<_>;
-
 
         
         // TODO this is probably wrong
@@ -181,7 +204,11 @@ fn main() {
                 _ => {}
             }
         });
-        camera.handle_input(&keycodes);
+
+        if !keycodes.is_empty() { 
+            camera.handle_input(&keycodes);
+            spp = -1;
+        }
 
     }
 }

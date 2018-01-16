@@ -31,6 +31,14 @@ struct Triangle {
   vec3 p3;
 };
 
+// simple. no frensel term yet
+struct Material {
+  // if emissive, then refl is the amount of light
+  uint emissive;
+  float refl;
+  vec3  diffuse;
+};
+
 struct Camera {
   vec3 origin;
   vec3 target;
@@ -46,6 +54,7 @@ struct Camera {
 struct Sphere {
   vec3 position;
   float radius;
+  Material material;
 };
 
 struct Ray {
@@ -59,8 +68,11 @@ layout(        set = 0, binding = 0, rgba8) uniform writeonly image2D img;
 layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   Camera camera;
   uint num_spheres;
+  int spp;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
+layout(        set = 0, binding = 3) buffer Accum     { vec3 accum[];       };
+
 //layout(std140, set = 0, binding = 3) buffer Positions { vec3   positions[]; };
 //layout(std140, set = 0, binding = 4) buffer Indices   { uvec3  indices[];   };
 //layout(std140, set = 0, binding = 5) buffer BVH       { Node   nodes[];     };
@@ -165,16 +177,34 @@ Ray generate_ray(vec2 uv) {
   return ray;
 }
 
+
+vec3 sample_ray(Ray ray, uvec4 rng) {
+  vec3 x = vec3(1.0);
+  uint i;
+  for (i = 0; i < 12; i++) {
+  }
+  return x;
+}
+
 void main() {
 
-    // clear the screen. Later on only
-    imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
+    //imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
+    uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * imageSize(img).x;
 
-    uint seed = wang_hash(wang_hash(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * imageSize(img).x));
+    if (spp == 0) {
+        accum[idx] = vec3(0.0);
+    }
+
+    uint seed = wang_hash(wang_hash(idx));
+    uint seed2 = wang_hash(wang_hash(spp));
+
+    uvec4 rng = uvec4(seed) + uvec4(seed2) + uvec4(0,1,2,3);
+
     float val = seed * (1.0 / 4294967269.0);
 
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
     Ray ray = generate_ray(uv);
+
 
     uint best_i;
     uint i;
@@ -187,9 +217,11 @@ void main() {
     if (t < 1.0 / 0.0) {
       vec3 intersection = ray.origin + ray.direction * t;
       vec3 normal = normalize(intersection - spheres[best_i].position);
+      accum[idx] = normal;
       
-      imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(normal, 1.0));
     }
+    imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(accum[idx], 1.0));
+
 
 }
 "]
