@@ -18,6 +18,7 @@ mod types;
 mod graphics;
 mod compute;
 use nalgebra::Vector3;
+use std::collections::HashSet;
 use std::sync::Arc;
 use vulkano::buffer::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
@@ -106,12 +107,14 @@ fn main() {
 
     let mut compute = compute::ComputePart::new(&device, graphics.texture.clone(), spheres);
 
+
+
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
     let mut camera =
         tracer::ty::Camera::new(Vector3::new(0., 3., 5.), Vector3::new(0., 0., 0.), 20.);
 
-
+    let mut keycodes = HashSet::new();
 
     loop {
         previous_frame_end.cleanup_finished();
@@ -122,7 +125,7 @@ fn main() {
 
         graphics.recreate_framebuffers();
 
-        let (image_num, future) = match graphics.acquire_next_image() {
+        let (image_num, acquire_future) = match graphics.acquire_next_image() {
             Ok(r) => r,
             Err(vulkano::swapchain::AcquireError::OutOfDate) => {
                 continue;
@@ -133,23 +136,28 @@ fn main() {
 
         let cb = {
             let mut cbb =
-                AutoCommandBufferBuilder::primary_one_time_submit(device.clone(), queue.family())
+                AutoCommandBufferBuilder::new(device.clone(), queue.family())
                     .unwrap();
-            cbb = compute.render(cbb, graphics.dimensions, tracer::ty::Input { camera , num_spheres });
+            cbb = compute.render(
+                cbb,
+                graphics.dimensions,
+                tracer::ty::Input {
+                    camera,
+                    num_spheres,
+                },
+            );
             cbb = graphics.draw(cbb, image_num);
-            cbb.end_render_pass().unwrap().build().unwrap()
+            cbb.build().unwrap()
         };
 
-        let future = previous_frame_end
-            .join(future)
-            .then_execute(queue.clone(), cb)
-            .unwrap()
+        let future = previous_frame_end.join(acquire_future)
+            .then_execute(queue.clone(), cb).unwrap()
             .then_swapchain_present(queue.clone(), graphics.swapchain.clone(), image_num)
-            .then_signal_fence_and_flush()
-            .unwrap();
+            .then_signal_fence_and_flush().unwrap();
         previous_frame_end = Box::new(future) as Box<_>;
 
 
+        
         // TODO this is probably wrong
         events_loop.poll_events(|event| {
             match event {
@@ -157,7 +165,14 @@ fn main() {
                     match event {
                         WindowEvent::Resized(_width, _height) => graphics.recreate_swapchain = true,
                         WindowEvent::KeyboardInput { input, .. } => {
-                            camera.handle_input(input.virtual_keycode.unwrap());
+                            match input.state {
+                                winit::ElementState::Pressed => {
+                                    keycodes.insert(input.virtual_keycode.unwrap());
+                                },
+                                winit::ElementState::Released => {
+                                    keycodes.remove(&input.virtual_keycode.unwrap());
+                                },
+                            }
                         }
                         _ => {}
                     }
@@ -166,6 +181,7 @@ fn main() {
                 _ => {}
             }
         });
+        camera.handle_input(&keycodes);
 
     }
 }

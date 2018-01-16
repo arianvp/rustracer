@@ -1,6 +1,7 @@
 use nalgebra::{Vector3, Point3};
 use std::fmt::Debug;
 use winit::VirtualKeyCode;
+use std::collections::HashSet;
 
 #[derive(VulkanoShader)]
 #[ty = "compute"]
@@ -244,52 +245,54 @@ impl ty::Camera {
         self.p3 = (c + (-0.5 * self.focal_distance * right) + (-0.5 * self.focal_distance * up)).into();
     }
 
-   pub fn handle_input(&mut self, keycode: VirtualKeyCode) {
-        match keycode {
-            VirtualKeyCode::W => {
-                self.origin = (Vector3::from(self.origin) + 0.1 * Vector3::from(self.direction)).into();
-            },
-            VirtualKeyCode::A => {
-                self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.right))).into();
-                self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right))).into();
-            },
-            VirtualKeyCode::S => {
-                self.origin = (Vector3::from(self.origin) + -0.1 * Vector3::from(self.direction)).into();
-            },
-            VirtualKeyCode::D => {
-                self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.right))).into();
-                self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right))).into();
-            },
-            VirtualKeyCode::E => {
-                self.origin = (Vector3::from(self.origin) + 10.0 * Vector3::from(self.direction)).into();
-                self.target = (Vector3::from(self.target) + 10.0 * Vector3::from(self.direction)).into();
-            },
-            VirtualKeyCode::Q => {
-                self.origin = (Vector3::from(self.origin) + -10.0 * Vector3::from(self.direction)).into();
-                self.target = (Vector3::from(self.target) + -10.0 * Vector3::from(self.direction)).into();
-            },
-            VirtualKeyCode::R => {
-                self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.up))).into();
-                self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up))).into();
-            },
-            VirtualKeyCode::F => {
-                self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.up))).into();
-                self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up))).into();
-            },
-            VirtualKeyCode::Up => {
-                self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up))).into();
-            },
-            VirtualKeyCode::Down => {
-                self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up))).into();
-            },
-            VirtualKeyCode::Left => {
-                self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right))).into();
-            },
-            VirtualKeyCode::Right => {
-                self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right))).into();
-            },
-            _ => {},
-        }
+   pub fn handle_input(&mut self, keycodes: &HashSet<VirtualKeyCode>) {
+       for keycode in keycodes {
+            match *keycode {
+                VirtualKeyCode::W => {
+                    self.origin = (Vector3::from(self.origin) + 0.1 * Vector3::from(self.direction)).into();
+                },
+                VirtualKeyCode::A => {
+                    self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.right))).into();
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right))).into();
+                },
+                VirtualKeyCode::S => {
+                    self.origin = (Vector3::from(self.origin) + -0.1 * Vector3::from(self.direction)).into();
+                },
+                VirtualKeyCode::D => {
+                    self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.right))).into();
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right))).into();
+                },
+                VirtualKeyCode::E => {
+                    self.origin = (Vector3::from(self.origin) + 10.0 * Vector3::from(self.direction)).into();
+                    self.target = (Vector3::from(self.target) + 10.0 * Vector3::from(self.direction)).into();
+                },
+                VirtualKeyCode::Q => {
+                    self.origin = (Vector3::from(self.origin) + -10.0 * Vector3::from(self.direction)).into();
+                    self.target = (Vector3::from(self.target) + -10.0 * Vector3::from(self.direction)).into();
+                },
+                VirtualKeyCode::R => {
+                    self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.up))).into();
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up))).into();
+                },
+                VirtualKeyCode::F => {
+                    self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.up))).into();
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up))).into();
+                },
+                VirtualKeyCode::Up => {
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up))).into();
+                },
+                VirtualKeyCode::Down => {
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up))).into();
+                },
+                VirtualKeyCode::Left => {
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right))).into();
+                },
+                VirtualKeyCode::Right => {
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right))).into();
+                },
+                _ => {},
+            }
+       }
         self.update();
     }
 }

@@ -19,11 +19,7 @@ pub struct ComputePart<I: 'static + ImageViewAccess + Send + Sync> {
 }
 
 impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
-    pub fn new(
-        device: &Arc<Device>,
-        image: Arc<I>,
-        scene: Vec<tracer::ty::Sphere>,
-    ) -> ComputePart<I> {
+    pub fn new(device: &Arc<Device>, image: Arc<I>, scene: Vec<tracer::ty::Sphere>) -> ComputePart<I> {
         let shader = tracer::Shader::load(device.clone()).expect("failed to create shader module");
         let pipeline = Arc::new(
             ComputePipeline::new(device.clone(), &shader.main_entry_point(), &())
@@ -32,10 +28,8 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
 
         let input_pool = CpuBufferPool::uniform_buffer(device.clone());
 
-
-        let scene =
-            CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), scene.into_iter())
-                .unwrap();
+        
+        let scene = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), scene.into_iter()).unwrap();
 
         ComputePart {
             pipeline,
@@ -59,7 +53,10 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
             .unwrap()
     }
 
-    fn next_set(&mut self, input: tracer::ty::Input) -> Arc<DescriptorSet + Send + Sync> {
+    fn next_set(
+        &mut self,
+        input: tracer::ty::Input,
+    ) -> Arc<DescriptorSet + Send + Sync> {
         Arc::new(
             PersistentDescriptorSet::start(self.pipeline.clone(), 0)
                 .add_image(self.image.clone())

@@ -58,7 +58,7 @@ impl GraphicsPart {
             single_pass_renderpass!(device.clone(),
             attachments: {
                 color: {
-                    load: DontCare,
+                    load: Clear,
                     store: DontCare,
                     format: swapchain.format(),
                     samples: 1,
@@ -210,7 +210,7 @@ impl GraphicsPart {
             },
             self.vertex_buffer.clone(),
             self.set.clone(), ())
-            .unwrap()
+            .unwrap().end_render_pass().unwrap()
     }
 
     pub fn acquire_next_image(
