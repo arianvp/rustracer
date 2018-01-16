@@ -90,7 +90,6 @@ fn main() {
 
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
-    let uniform_pool = CpuBufferPool::uniform_buffer(device.clone());
 
     loop {
         previous_frame_end.cleanup_finished();
@@ -109,20 +108,14 @@ fn main() {
             Err(err) => panic!("{:?}", err),
         };
 
-        let uniform = Arc::new(
-            uniform_pool
-                .next(tracer::ty::Input {
-                    camera: tracer::ty::Camera::new(Vector3::new(0.,3.,5.), Vector3::new(0.,0.,0.), 20.),
-                    //samples_per_pixel: 0,
-                })
-                .unwrap(),
-        );
 
         let cb = {
             let mut cbb =
                 AutoCommandBufferBuilder::primary_one_time_submit(device.clone(), queue.family())
                     .unwrap();
-            cbb = compute.render(cbb, graphics.dimensions, uniform);
+            cbb = compute.render(cbb, graphics.dimensions, tracer::ty::Input {
+                camera: tracer::ty::Camera::new(Vector3::new(0.,3.,5.), Vector3::new(0.,0.,0.), 20.),
+            });
             cbb = graphics.draw(cbb, image_num);
             cbb.end_render_pass().unwrap().build().unwrap()
         };
