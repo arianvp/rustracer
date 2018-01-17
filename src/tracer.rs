@@ -158,17 +158,23 @@ uint wang_hash(uint seed) {
   return seed;
 }
 
-uvec4 next(uvec4 ctx) {
-  uint t = ctx.x ^ (ctx.x << 11);
-  ctx = ctx.yzww;
-  ctx.w = ctx.w & (ctx.w >> 19) ^ (t ^ (t >> 8));
-  return ctx;
+float next_float(inout uvec4 rng) {
+  uint t = rng.x ^ (rng.x << 11);
+  rng = rng.yzww;
+  rng.w = rng.w & (rng.w >> 19) ^ (t ^ (t >> 8));
+  return float(rng.w) * (1.0 / 4294967296.0);
 }
 
-vec3 sample_ray(Ray ray) {
-  vec3 transmission = vec3(1.0, 1.0, 1.0);
-  vec3 emission = vec3(0.0, 0.0, 0.0);
-  return emission;
+float hash1(inout float seed) {
+    return fract(sin(seed += 0.1)*43758.5453123);
+}
+
+vec2 hash2(inout float seed) {
+    return fract(sin(vec2(seed+=0.1,seed+=0.1))*vec2(43758.5453123,22578.1459123));
+}
+
+vec3 hash3(inout float seed) {
+    return fract(sin(vec3(seed+=0.1,seed+=0.1,seed+=0.1))*vec3(43758.5453123,22578.1459123,19642.3490423));
 }
 
 
@@ -180,80 +186,59 @@ Ray generate_ray(vec2 uv) {
   return ray;
 }
 
-struct DiffuseReflection {
-    vec3 refl;
-    uvec4 rng;
-};
 
-
-vec3 local_2_world( vec3 V, vec3 N )
-{
-	// based on SmallVCM
-	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
-	vec3 B = normalize( cross( N, tmp ) );
-	vec3 T = cross( B, N );
-	return V.x * T + V.y * B + V.z * N;
+vec3 cosWeightedRandomHemisphereDirection( const vec3 n, inout float seed ) {
+  	vec2 r = hash2(seed);
+    
+	vec3  uu = normalize( cross( n, vec3(0.0,1.0,1.0) ) );
+	vec3  vv = cross( uu, n );
+	
+	float ra = sqrt(r.y);
+	float rx = ra*cos(2*PI*r.x); 
+	float ry = ra*sin(2*PI*r.x);
+	float rz = sqrt( 1.0-r.y );
+	vec3  rr = vec3( rx*uu + ry*vv + rz*n );
+    
+    return normalize( rr );
 }
 
-vec3 world_2_local( vec3 V, vec3 N )
-{
-	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
-	vec3 B = normalize( cross( N, tmp ) );
-	vec3 T = cross( B, N );
-	return vec3( dot( V, T ), dot( V, B ), dot( V, N ) );
-}
+vec3 trace(Ray ray, inout float seed) {
+    vec3 emit = vec3(0.0);
+    vec3 trans = vec3(1.0);
 
-DiffuseReflection diffuse(uvec4 rng, vec3 normal) {
-    uvec4 rng1 = next(rng);
-    uvec4 rng2 = next(rng1);
+    for (int j = 0; j < 8; j++) {
+      int best_j;
+      float t  = 1.0 / 0.0;
+      for (int j = 0; j < num_spheres; j++) {
+        float t_new = intersects_sphere(ray, spheres[j]);
+        if (t_new < t) { t = t_new; best_j = j; }
+      }
+      if (t >= 1.0 / 0.0) {
+        emit = vec3(0.0);
+        break;
+      }
 
-    float r0 = float(rng1.w) * (1.0 / 4294967296.0);
-    float r1 = float(rng2.w) * (1.0 / 4294967296.0);
 
-    DiffuseReflection ret;
-    ret.rng = rng2;
+      Material material = spheres[best_j].material;
 
-    float r = sqrt(1.0 - r0 * r0);
-    float phi  = 2.0 * PI * r1;
-    vec3 dir = vec3(cos(phi) * r, sin(phi) * r, r0);
-    if (dot(dir,normal) < 0.0) {
-      ret.refl = -1.0 * dir;
-    } else {
-      ret.refl = dir;
+      if (material.emissive == 1) {
+        emit += trans * material.diffuse;
+        break;
+      }
+
+      vec3 intersection = ray.origin + ray.direction * t;
+      vec3 normal = normalize(intersection - spheres[best_j].position);
+
+      ray.origin = intersection + normal * EPSILON;
+      ray.direction = cosWeightedRandomHemisphereDirection(normal, seed);
+      trans *= material.diffuse;
+
     }
-    return ret;
+
+    return emit;
 }
 
-// random direction on a half sphere
-DiffuseReflection cosine_diffuse_reflection(uvec4 rng) {
-
-    uvec4 rng1 = next(rng);
-    uvec4 rng2 = next(rng1);
-
-    float r0 = float(rng1.w) * (1.0 / 4294967296.0);
-    float r1 = float(rng2.w) * (1.0 / 4294967296.0);
-
-    float term1 = 2.0 * PI * r0;
-    float term2 = sqrt(1.0 - r1);
-
-    DiffuseReflection ret;
-    vec3 refl = vec3(cos(term1) * term2, sin(term1) * term2, sqrt(r1));
-    ret.refl = refl;
-    ret.rng = rng2;
-
-    return ret;
-}
-
-vec3 sample_ray2(Ray ray, uvec4 rng) {
-  vec3 trans = vec3(1.0);
-  vec3 e = vec3(0.0);
-  uint i;
-  for (i = 0; i < 3; i++) {
-  }
-  return e;
-}
-
-vec3 sample_ray(Ray ray, uvec4 rng) {
+/*vec3 sample_ray(Ray ray, uvec4 rng) {
   vec3 s = vec3(0.0);
   vec3 mask = vec3(1.0);
   uint i;
@@ -272,11 +257,6 @@ vec3 sample_ray(Ray ray, uvec4 rng) {
     }; 
     Material material = spheres[best_j].material;
 
-    if (material.emissive == 1) {
-      mask *= material.diffuse;
-      s += mask;
-      break;
-    }
     vec3 intersection = ray.origin + ray.direction * t;
     vec3 normal = normalize(intersection - spheres[best_j].position);
 
@@ -294,19 +274,19 @@ vec3 sample_ray(Ray ray, uvec4 rng) {
     vec3 axis = (abs(w.x) > 0.1) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 u = normalize(cross(axis,w));
     vec3 v = cross(w,u);
+
     vec3 newdir = normalize(u * cos(rand1)*rand2s + v*sin(rand1)*rand2s + w*sqrt(1.0-rand2));
     ray.origin = intersection + normal_facing * EPSILON;
     ray.direction = newdir;
 
 
-    s += mask;
-
+    s += mask * material.diffuse * float(material.emissive + 1);
     mask *= material.diffuse;
     mask *= dot(newdir, normal_facing);
 
   }
   return s;
-}
+}*/
 
 void main() {
 
@@ -318,23 +298,16 @@ void main() {
         imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
     }
 
-    uint seed = wang_hash(wang_hash(idx));
-    uint seed2 = wang_hash(wang_hash(frame_num));
+    float seed = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 3.43121412313 + fract(1.12345314312*float(frame_num));
 
-    uvec4 rng = uvec4(seed) + uvec4(seed2) + uvec4(0,1,2,3);
-
-    float val = seed * (1.0 / 4294967269.0);
 
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
+
     Ray ray = generate_ray(uv);
-
-
-    vec3 color = sample_ray(ray, rng);
+    vec3 color = trace(ray, seed);
 
     accum[idx] += color;
-
     vec3 outCol = accum[idx] / float(frame_num);
-
     imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(outCol, 1.0));
 
 
