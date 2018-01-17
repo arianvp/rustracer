@@ -81,41 +81,6 @@ layout(        set = 0, binding = 3) buffer Accum     { vec3 accum[];       };
 //layout(std140, set = 0, binding = 5) buffer BVH       { Node   nodes[];     };
 //layout(std140, set = 0, binding = 6) buffer Length    { uint   node_length; };
 
-
-
-/*Triangle get_triangle(uint idx) {
-  Triangle triangle;
-  triangle.p1 = positions[indices[idx].x];
-  triangle.p2 = positions[indices[idx].y];
-  triangle.p3 = positions[indices[idx].z];
-  return triangle;
-}*/
-
-/*float intersect_scene(Ray ray) {
-  uint idx = 0;
-  uint max_length = node_length;
-  float best_time = 1.0 / 0.0;
-  while (idx < max_length) {
-    Node node = nodes[idx];
-    if (node.entry_index == MAX_VALUE) { // leaf node
-      Triangle triangle = get_triangle(node.shape_index);
-      idx = node.exit_index;
-      if (intersects_aabb(ray, node.aabb)) {
-        float time = intersects_triangle(ray, triangle);
-        if (time < best_time) {
-          best_time = time;
-        }
-      }
-    } else if (intersects_aabb(ray, node.aabb)) { // intersects internal node
-      idx = node.entry_index;
-    } else {
-      idx = node.exit_index;
-    }
-  }
-  return best_time;
-}*/
-
-
 bool intersects_aabb(Ray ray, AABB aabb) {
   return false;
 }
@@ -149,6 +114,8 @@ float intersects_sphere(Ray ray, Sphere sphere) {
   return t0;
 }
 
+// wide hash + deep lcg from 
+// http://www.reedbeta.com/blog/quick-and-easy-gpu-random-numbers-in-d3d11/
 uint wang_hash(uint seed) {
   seed = (seed ^ 61) ^ (seed >> 16);
   seed *= 9;
@@ -158,23 +125,9 @@ uint wang_hash(uint seed) {
   return seed;
 }
 
-float next_float(inout uvec4 rng) {
-  uint t = rng.x ^ (rng.x << 11);
-  rng = rng.yzww;
-  rng.w = rng.w & (rng.w >> 19) ^ (t ^ (t >> 8));
-  return float(rng.w) * (1.0 / 4294967296.0);
-}
-
-float hash1(inout float seed) {
-    return fract(sin(seed += 0.1)*43758.5453123);
-}
-
-vec2 hash2(inout float seed) {
-    return fract(sin(vec2(seed+=0.1,seed+=0.1))*vec2(43758.5453123,22578.1459123));
-}
-
-vec3 hash3(inout float seed) {
-    return fract(sin(vec3(seed+=0.1,seed+=0.1,seed+=0.1))*vec3(43758.5453123,22578.1459123,19642.3490423));
+float next_float_lcg(inout uint state) {
+  state = 1664525 * state + 1013904223;
+  return state * (1.0 / 4294967296.0);
 }
 
 
@@ -186,9 +139,9 @@ Ray generate_ray(vec2 uv) {
   return ray;
 }
 
-
-vec3 cosWeightedRandomHemisphereDirection( const vec3 n, inout float seed ) {
-  	vec2 r = hash2(seed);
+// TODO replace with own thing
+vec3 cosWeightedRandomHemisphereDirection( const vec3 n, inout uint seed ) {
+        vec2 r = vec2(next_float_lcg(seed), next_float_lcg(seed));
     
 	vec3  uu = normalize( cross( n, vec3(0.0,1.0,1.0) ) );
 	vec3  vv = cross( uu, n );
@@ -202,7 +155,7 @@ vec3 cosWeightedRandomHemisphereDirection( const vec3 n, inout float seed ) {
     return normalize( rr );
 }
 
-vec3 trace(Ray ray, inout float seed) {
+vec3 trace(Ray ray, inout uint seed) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
 
@@ -298,7 +251,12 @@ void main() {
         imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
     }
 
-    float seed = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 3.43121412313 + fract(1.12345314312*float(frame_num));
+    //float seed = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 3.43121412313 + fract(1.12345314312*float(frame_num));
+
+    uint seed = (gl_GlobalInvocationID.x) | (gl_GlobalInvocationID.y << 9) |  (frame_num << 18);
+
+    // we want to decoralate pixels. Hashes are very suited for this
+    seed = wang_hash(seed);
 
 
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
