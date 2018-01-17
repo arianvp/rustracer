@@ -1,6 +1,7 @@
 #![feature(fused)]
 #![feature(exact_size_is_empty)]
 
+extern crate bvh;
 extern crate fps_counter;
 #[macro_use]
 extern crate vulkano_shader_derive;
@@ -18,6 +19,7 @@ mod tracer;
 mod types;
 mod graphics;
 mod compute;
+mod scene;
 use fps_counter::FPSCounter;
 use nalgebra::Vector3;
 use std::collections::HashSet;

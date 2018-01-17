@@ -1,5 +1,4 @@
 
-extern crate vulkano;
 use tracer;
 use std::iter;
 use std::sync::Arc;
@@ -30,8 +29,6 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
         );
 
         let input_pool = CpuBufferPool::uniform_buffer(device.clone());
-
-        
         let scene = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), scene.into_iter()).unwrap();
 
         // not sure why I accumulate by 3 here ...

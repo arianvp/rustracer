@@ -191,55 +191,6 @@ vec3 trace(Ray ray, inout uint seed) {
     return emit;
 }
 
-/*vec3 sample_ray(Ray ray, uvec4 rng) {
-  vec3 s = vec3(0.0);
-  vec3 mask = vec3(1.0);
-  uint i;
-  for (i = 0; i < 12; i++) {
-
-    uint best_j;
-    uint j;
-    float t  = 1.0 / 0.0;
-    for (j = 0; j < num_spheres; j++) {
-      float t_new = intersects_sphere(ray, spheres[j]);
-      if (t_new < t) { t = t_new; best_j = j; }
-    }
-    if (t >= 1.0 / 0.0) {
-      s = vec3(0.0);
-      break;
-    }; 
-    Material material = spheres[best_j].material;
-
-    vec3 intersection = ray.origin + ray.direction * t;
-    vec3 normal = normalize(intersection - spheres[best_j].position);
-
-    uvec4 rng1 = next(rng);
-    uvec4 rng2 = next(rng1);
-    rng  = rng2;
-
-    float rand1 = float(rng1.w) * (1.0 / 4294967296.0);
-    float rand2 = float(rng2.w) * (1.0 / 4294967296.0);
-    float rand2s = sqrt(rand2);
-
-
-    vec3 normal_facing = dot(normal, ray.direction) < 0.0 ? normal : normal * (-1.0f);
-    vec3 w = normal_facing;
-    vec3 axis = (abs(w.x) > 0.1) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 u = normalize(cross(axis,w));
-    vec3 v = cross(w,u);
-
-    vec3 newdir = normalize(u * cos(rand1)*rand2s + v*sin(rand1)*rand2s + w*sqrt(1.0-rand2));
-    ray.origin = intersection + normal_facing * EPSILON;
-    ray.direction = newdir;
-
-
-    s += mask * material.diffuse * float(material.emissive + 1);
-    mask *= material.diffuse;
-    mask *= dot(newdir, normal_facing);
-
-  }
-  return s;
-}*/
 
 void main() {
 
@@ -251,10 +202,9 @@ void main() {
         imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
     }
 
-    //float seed = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 3.43121412313 + fract(1.12345314312*float(frame_num));
 
+    // screen is now 512 by 512. which fits in 9 bits. 
     uint seed = (gl_GlobalInvocationID.x) | (gl_GlobalInvocationID.y << 9) |  (frame_num << 18);
-
     // we want to decoralate pixels. Hashes are very suited for this
     seed = wang_hash(seed);
 
