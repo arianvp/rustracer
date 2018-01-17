@@ -8,7 +8,10 @@ use std::collections::HashSet;
 #[src = "
 #version 450
 
-#define MAX_VALUE 5000
+#define MAX_VALUE (5000)
+#define PI (3.1415926535359)
+#define INV_PI (1.0 / PI)
+#define EPSILON (0.0001)
 
 struct AABB {
   vec3 min;
@@ -68,7 +71,7 @@ layout(        set = 0, binding = 0, rgba8) uniform writeonly image2D img;
 layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   Camera camera;
   uint num_spheres;
-  int spp;
+  int frame_num;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 layout(        set = 0, binding = 3) buffer Accum     { vec3 accum[];       };
@@ -177,13 +180,132 @@ Ray generate_ray(vec2 uv) {
   return ray;
 }
 
+struct DiffuseReflection {
+    vec3 refl;
+    uvec4 rng;
+};
+
+
+vec3 local_2_world( vec3 V, vec3 N )
+{
+	// based on SmallVCM
+	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
+	vec3 B = normalize( cross( N, tmp ) );
+	vec3 T = cross( B, N );
+	return V.x * T + V.y * B + V.z * N;
+}
+
+vec3 world_2_local( vec3 V, vec3 N )
+{
+	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
+	vec3 B = normalize( cross( N, tmp ) );
+	vec3 T = cross( B, N );
+	return vec3( dot( V, T ), dot( V, B ), dot( V, N ) );
+}
+
+DiffuseReflection diffuse(uvec4 rng, vec3 normal) {
+    uvec4 rng1 = next(rng);
+    uvec4 rng2 = next(rng1);
+
+    float r0 = float(rng1.w) * (1.0 / 4294967296.0);
+    float r1 = float(rng2.w) * (1.0 / 4294967296.0);
+
+    DiffuseReflection ret;
+    ret.rng = rng2;
+
+    float r = sqrt(1.0 - r0 * r0);
+    float phi  = 2.0 * PI * r1;
+    vec3 dir = vec3(cos(phi) * r, sin(phi) * r, r0);
+    if (dot(dir,normal) < 0.0) {
+      ret.refl = -1.0 * dir;
+    } else {
+      ret.refl = dir;
+    }
+    return ret;
+}
+
+// random direction on a half sphere
+DiffuseReflection cosine_diffuse_reflection(uvec4 rng) {
+
+    uvec4 rng1 = next(rng);
+    uvec4 rng2 = next(rng1);
+
+    float r0 = float(rng1.w) * (1.0 / 4294967296.0);
+    float r1 = float(rng2.w) * (1.0 / 4294967296.0);
+
+    float term1 = 2.0 * PI * r0;
+    float term2 = sqrt(1.0 - r1);
+
+    DiffuseReflection ret;
+    vec3 refl = vec3(cos(term1) * term2, sin(term1) * term2, sqrt(r1));
+    ret.refl = refl;
+    ret.rng = rng2;
+
+    return ret;
+}
+
+vec3 sample_ray2(Ray ray, uvec4 rng) {
+  vec3 trans = vec3(1.0);
+  vec3 e = vec3(0.0);
+  uint i;
+  for (i = 0; i < 3; i++) {
+  }
+  return e;
+}
 
 vec3 sample_ray(Ray ray, uvec4 rng) {
-  vec3 x = vec3(1.0);
+  vec3 s = vec3(0.0);
+  vec3 mask = vec3(1.0);
   uint i;
   for (i = 0; i < 12; i++) {
+
+    uint best_j;
+    uint j;
+    float t  = 1.0 / 0.0;
+    for (j = 0; j < num_spheres; j++) {
+      float t_new = intersects_sphere(ray, spheres[j]);
+      if (t_new < t) { t = t_new; best_j = j; }
+    }
+    if (t >= 1.0 / 0.0) {
+      s = vec3(0.0);
+      break;
+    }; 
+    Material material = spheres[best_j].material;
+
+    if (material.emissive == 1) {
+      mask *= material.diffuse;
+      s += mask;
+      break;
+    }
+    vec3 intersection = ray.origin + ray.direction * t;
+    vec3 normal = normalize(intersection - spheres[best_j].position);
+
+    uvec4 rng1 = next(rng);
+    uvec4 rng2 = next(rng1);
+    rng  = rng2;
+
+    float rand1 = float(rng1.w) * (1.0 / 4294967296.0);
+    float rand2 = float(rng2.w) * (1.0 / 4294967296.0);
+    float rand2s = sqrt(rand2);
+
+
+    vec3 normal_facing = dot(normal, ray.direction) < 0.0 ? normal : normal * (-1.0f);
+    vec3 w = normal_facing;
+    vec3 axis = (abs(w.x) > 0.1) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 u = normalize(cross(axis,w));
+    vec3 v = cross(w,u);
+    vec3 newdir = normalize(u * cos(rand1)*rand2s + v*sin(rand1)*rand2s + w*sqrt(1.0-rand2));
+    ray.origin = intersection + normal_facing * EPSILON;
+    ray.direction = newdir;
+
+
+    s += mask;
+
+    mask *= material.diffuse;
+    mask *= dot(newdir, normal_facing);
+
   }
-  return x;
+  return s;
 }
 
 void main() {
@@ -191,12 +313,13 @@ void main() {
     //imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
     uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * imageSize(img).x;
 
-    if (spp == 0) {
+    if (frame_num == 1) {
         accum[idx] = vec3(0.0);
+        imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
     }
 
     uint seed = wang_hash(wang_hash(idx));
-    uint seed2 = wang_hash(wang_hash(spp));
+    uint seed2 = wang_hash(wang_hash(frame_num));
 
     uvec4 rng = uvec4(seed) + uvec4(seed2) + uvec4(0,1,2,3);
 
@@ -206,21 +329,13 @@ void main() {
     Ray ray = generate_ray(uv);
 
 
-    uint best_i;
-    uint i;
-    float t  = 1.0 / 0.0;
-    for (i = 0; i < num_spheres; i++) {
-      float t_new = intersects_sphere(ray, spheres[i]);
-      if (t_new < t) { t = t_new; best_i = i; }
-    }
+    vec3 color = sample_ray(ray, rng);
 
-    if (t < 1.0 / 0.0) {
-      vec3 intersection = ray.origin + ray.direction * t;
-      vec3 normal = normalize(intersection - spheres[best_i].position);
-      accum[idx] = normal;
-      
-    }
-    imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(accum[idx], 1.0));
+    accum[idx] += color;
+
+    vec3 outCol = accum[idx] / float(frame_num);
+
+    imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(outCol, 1.0));
 
 
 }

@@ -1,6 +1,7 @@
 #![feature(fused)]
 #![feature(exact_size_is_empty)]
 
+extern crate fps_counter;
 #[macro_use]
 extern crate vulkano_shader_derive;
 #[macro_use]
@@ -17,6 +18,7 @@ mod tracer;
 mod types;
 mod graphics;
 mod compute;
+use fps_counter::FPSCounter;
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -101,21 +103,10 @@ fn main() {
             _dummy0: [0;4],
         },
         tracer::ty::Sphere {
-            position: [0.4; 3],
+            position: [1.4; 3],
             radius: 0.5,
             material: tracer::ty::Material {
-                diffuse: [0.3, 0.2, 0.3],
-                refl: 0.2,
-                emissive: 0,
-                _dummy0: [0;8],
-            },
-            _dummy0: [0;4],
-        },
-        tracer::ty::Sphere {
-            position: [0.6; 3],
-            radius: 0.5,
-            material: tracer::ty::Material {
-                diffuse: [0.3, 0.2, 0.3],
+                diffuse: [1.0, 1.0, 1.0],
                 refl: 0.0,
                 emissive: 1,
                 _dummy0: [0;8],
@@ -136,10 +127,11 @@ fn main() {
         tracer::ty::Camera::new(Vector3::new(0., 3., 5.), Vector3::new(0., 0., 0.), 20.);
 
     let mut keycodes = HashSet::new();
-    let mut spp = -1;
+    let mut frame_num = 1;
+    let mut fps_counter = FPSCounter::new();
 
     loop {
-        spp += 1;
+        println!("frame_num: {:?}", frame_num);
         previous_frame_end.cleanup_finished();
 
         if graphics.recreate_swapchain(&window) {
@@ -167,7 +159,7 @@ fn main() {
                 tracer::ty::Input {
                     camera,
                     num_spheres,
-                    spp,
+                    frame_num,
                 },
             );
             cbb = graphics.draw(cbb, image_num);
@@ -207,8 +199,9 @@ fn main() {
 
         if !keycodes.is_empty() { 
             camera.handle_input(&keycodes);
-            spp = -1;
+            frame_num = 0;
         }
+        frame_num += 1;
 
     }
 }
