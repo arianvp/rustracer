@@ -46,7 +46,6 @@ struct Triangle {
   vec3 p1;
   vec3 p2;
   vec3 p3;
-  Material material;
 };
 
 
@@ -99,8 +98,6 @@ float intersects_plane(Ray ray, Plane plane) {
   return (-plane.d - dot(plane.normal, ray.origin)) / dot(plane.normal, ray.direction);
 }
 
-float intersects_triangle(Ray ray, Triangle triangle) {
-}
 
 float intersects_sphere(Ray ray, Sphere sphere) {
   vec3 distance = sphere.position - ray.origin;
@@ -236,10 +233,10 @@ vec3 trace(Ray ray, inout uint seed) {
       vec3 normal = typ == 0 ? planes[best_j].normal : normalize(intersection - spheres[best_j].position);
 
       ray.origin = intersection + normal * EPSILON;
-      ray.direction = local_to_world(diffuse_reflection_cos(seed), normal);
+      ray.direction = local_to_world(diffuse_reflection(seed), normal);
       vec3 brdf = material.diffuse * (1.0 / PI);
+      float pdf = 1.0 / (2.0 * PI);
       float cos_i = dot(ray.direction, normal);
-      float pdf = cos_i / PI;
       trans *= brdf * cos_i / pdf;
 
     }
