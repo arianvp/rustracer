@@ -17,7 +17,7 @@ pub struct ComputePart<I: 'static + ImageViewAccess + Send + Sync> {
     image: Arc<I>,
     input_pool: CpuBufferPool<tracer::ty::Input>,
     scene: Arc<CpuAccessibleBuffer<[tracer::ty::Sphere]>>,
-    accum: Arc<DeviceLocalBuffer<[[f32;3]]>>,
+    accum: Arc<CpuAccessibleBuffer<[[f32;4]]>>,
 }
 
 impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
@@ -31,8 +31,7 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
         let input_pool = CpuBufferPool::uniform_buffer(device.clone());
         let scene = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), scene.into_iter()).unwrap();
 
-        // not sure why I accumulate by 3 here ...
-        let accum = DeviceLocalBuffer::array(device.clone(), 512 * 512 * 3, BufferUsage::all(), iter::once(family)).unwrap();
+        let accum = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), (0..512*512).map(|_|[0.;4])).unwrap();
 
         ComputePart {
             pipeline,
@@ -42,7 +41,11 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
             accum,
         }
     }
-
+    pub fn calculate_energy(&self, framenum: i32) -> f32 {
+        let content = self.scene.read().unwrap();
+        let energy = content.into_iter().fold(0.0, |x,y| x + y.radius);
+        return energy;
+    }
     /// when `scene` is not None, a new scene will be uploaded
     pub fn render(
         &mut self,

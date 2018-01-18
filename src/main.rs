@@ -172,6 +172,13 @@ fn main() {
             .then_execute(queue.clone(), cb).unwrap()
             .then_swapchain_present(queue.clone(), graphics.swapchain.clone(), image_num)
             .then_signal_fence_and_flush().unwrap();
+
+        // lets wait until the frame is done, so we can access the buffer
+        // and calculate its energy.
+        future.wait(None).unwrap();
+        let energy = compute.calculate_energy(frame_num);
+        println!("{:?}", energy);
+
         previous_frame_end = Box::new(future) as Box<_>;
 
         
@@ -189,6 +196,7 @@ fn main() {
                                 winit::ElementState::Released => {
                                     keycodes.remove(&input.virtual_keycode.unwrap());
                                 },
+
                             }
                         }
                         _ => {}
