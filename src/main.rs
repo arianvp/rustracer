@@ -156,7 +156,7 @@ fn main() {
             position: [4.9, 1.0, 0.3],
             radius: 0.5,
             material: tracer::ty::Material {
-                diffuse: [0.9, 0.0, 0.0],
+                diffuse: [0.7, 0.8, 0.1],
                 refl: 0.0,
                 emissive: 0,
                 _dummy0: [0; 8],
@@ -165,7 +165,7 @@ fn main() {
         },
         tracer::ty::Sphere {
             position: [1.4, 3.9, 1.2],
-            radius: 0.2,
+            radius: 0.7,
             material: tracer::ty::Material {
                 diffuse: [27.0, 13.0, 12.0],
                 refl: 0.0,
@@ -247,6 +247,7 @@ fn main() {
         future.wait(None).unwrap();
         let energy = compute.calculate_energy(frame_num);
         println!("{:?}", energy);
+        println!("{:?}", fps_counter.tick());
 
         previous_frame_end = Box::new(future) as Box<_>;
 

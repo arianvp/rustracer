@@ -12,6 +12,7 @@ use std::collections::HashSet;
 #define PI (3.1415926535359)
 #define INV_PI (1.0 / PI)
 #define EPSILON (0.0001)
+#define COS_WEIGHTED
 
 struct AABB {
   vec3 min;
@@ -45,6 +46,7 @@ struct Triangle {
   vec3 p1;
   vec3 p2;
   vec3 p3;
+  Material material;
 };
 
 
@@ -97,6 +99,8 @@ float intersects_plane(Ray ray, Plane plane) {
   return (-plane.d - dot(plane.normal, ray.origin)) / dot(plane.normal, ray.direction);
 }
 
+float intersects_triangle(Ray ray, Triangle triangle) {
+}
 
 float intersects_sphere(Ray ray, Sphere sphere) {
   vec3 distance = sphere.position - ray.origin;
@@ -152,27 +156,51 @@ Ray generate_ray(vec2 uv) {
   return ray;
 }
 
-// TODO replace with own thing
-vec3 cosWeightedRandomHemisphereDirection( const vec3 n, inout uint seed ) {
-        vec2 r = vec2(next_float_lcg(seed), next_float_lcg(seed));
-    
-	vec3  uu = normalize( cross( n, vec3(0.0,1.0,1.0) ) );
-	vec3  vv = cross( uu, n );
-	
-	float ra = sqrt(r.y);
-	float rx = ra*cos(2*PI*r.x); 
-	float ry = ra*sin(2*PI*r.x);
-	float rz = sqrt( 1.0-r.y );
-	vec3  rr = vec3( rx*uu + ry*vv + rz*n );
-    
-    return normalize( rr );
+
+vec3 diffuse_reflection(inout uint seed)
+{
+	// based on SmallVCM / GIC
+    float r1 = next_float_lcg(seed);
+    float r2 = next_float_lcg(seed);
+	float term1 = 2 * PI * r1;
+	float term2 = 2 * sqrt( r2 * (1 - r2) );
+	vec3 R = vec3( cos( term1 ) * term2, sin( term1 ) * term2, 1 - 2 * r2 );
+	if (R.z < 0) R.z = -R.z;
+	return R;
+}
+
+vec3 local_to_world(const vec3 V, const vec3 N )
+{
+	// based on SmallVCM
+	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
+	vec3 B = normalize( cross( N, tmp ) );
+	vec3 T = cross( B, N );
+	return V.x * T + V.y * B + V.z * N;
+}
+
+vec3 world_to_local(const vec3 V, const vec3 N )
+{
+	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
+	vec3 B = normalize( cross( N, tmp ) );
+	vec3 T = cross( B, N );
+	return vec3( dot( V, T ), dot( V, B ), dot( V, N ) );
+}
+
+vec3 diffuse_reflection_cos(inout uint seed)
+{
+	// based on SmallVCM
+    float r0 = next_float_lcg(seed);
+    float r1 = next_float_lcg(seed);
+	float term1 = 2 * PI * r0;
+	float term2 = sqrt( 1 - r1 );
+	return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
 }
 
 vec3 trace(Ray ray, inout uint seed) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
 
-    for (int j = 0; j < 8; j++) {
+    for (int j = 0; j < 4; j++) {
       int typ;
       int best_j;
       float t  = 1.0 / 0.0;
@@ -196,7 +224,6 @@ vec3 trace(Ray ray, inout uint seed) {
         break;
       }
 
-
       Material material = typ == 0 ? planes[best_j].material : spheres[best_j].material;
 
       if (material.emissive == 1) {
@@ -207,11 +234,13 @@ vec3 trace(Ray ray, inout uint seed) {
       vec3 intersection = ray.origin + ray.direction * t;
 
       vec3 normal = typ == 0 ? planes[best_j].normal : normalize(intersection - spheres[best_j].position);
-      //return abs(normal);
 
       ray.origin = intersection + normal * EPSILON;
-      ray.direction = cosWeightedRandomHemisphereDirection(normal, seed);
-      trans *= material.diffuse;
+      ray.direction = local_to_world(diffuse_reflection_cos(seed), normal);
+      vec3 brdf = material.diffuse * (1.0 / PI);
+      float cos_i = dot(ray.direction, normal);
+      float pdf = cos_i / PI;
+      trans *= brdf * cos_i / pdf;
 
     }
 
@@ -239,6 +268,7 @@ void main() {
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
 
     Ray ray = generate_ray(uv);
+    
     vec3 color = trace(ray, seed);
 
     accum[idx] += color;
