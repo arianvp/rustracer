@@ -90,6 +90,27 @@ fn main() {
         graphics::GraphicsPart::new(device.clone(), &window, physical.clone(), queue.clone());
 
 
+    let triangles = vec![
+        tracer::ty::Triangle {
+
+            p1: [3.9,  5.4, 3.0],
+            p2: [4.9,  5.4, 3.0],
+            p3: [3.13, 5.4, 2.0],
+            material: tracer::ty::Material {
+                diffuse: [17., 17., 17.],
+                refl: 0.0,
+                emissive: 1,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0;4],
+            _dummy1: [0;4],
+            _dummy2: [0;4],
+            _dummy3: [0;4],
+        },
+    ];
+
+    let num_triangles = triangles.len() as u32;
+
     let planes = vec![
         tracer::ty::Plane {
             normal: [0., 1., 0.],
@@ -163,7 +184,7 @@ fn main() {
             },
             _dummy0: [0; 4],
         },
-        tracer::ty::Sphere {
+        /*tracer::ty::Sphere {
             position: [1.4, 3.9, 1.2],
             radius: 0.7,
             material: tracer::ty::Material {
@@ -173,7 +194,7 @@ fn main() {
                 _dummy0: [0; 8],
             },
             _dummy0: [0; 4],
-        },
+        },*/
     ];
 
     let num_spheres = spheres.len() as u32;
@@ -183,6 +204,7 @@ fn main() {
         graphics.texture.clone(),
         spheres,
         planes,
+        triangles,
         queue.family(),
     );
 
@@ -227,6 +249,7 @@ fn main() {
                     camera,
                     num_spheres,
                     num_planes,
+                    num_triangles,
                     frame_num,
                 },
             );

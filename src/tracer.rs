@@ -12,7 +12,6 @@ use std::collections::HashSet;
 #define PI (3.1415926535359)
 #define INV_PI (1.0 / PI)
 #define EPSILON (0.0001)
-#define COS_WEIGHTED
 
 struct AABB {
   vec3 min;
@@ -46,6 +45,7 @@ struct Triangle {
   vec3 p1;
   vec3 p2;
   vec3 p3;
+  Material material;
 };
 
 
@@ -79,14 +79,14 @@ layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   Camera camera;
   uint num_spheres;
   uint num_planes;
+  uint num_triangles;
   int frame_num;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 layout(std140, set = 0, binding = 3) buffer Planes    { Plane  planes[];    };
-layout(        set = 0, binding = 4) buffer Accum     { vec3   accum[];     };
+layout(std140, set = 0, binding = 4) buffer Triangles { Triangle triangles[]; };
+layout(        set = 0, binding = 5) buffer Accum     { vec3   accum[];     };
 
-//layout(std140, set = 0, binding = 3) buffer Positions { vec3   positions[]; };
-//layout(std140, set = 0, binding = 4) buffer Indices   { uvec3  indices[];   };
 //layout(std140, set = 0, binding = 5) buffer BVH       { Node   nodes[];     };
 //layout(std140, set = 0, binding = 6) buffer Length    { uint   node_length; };
 
@@ -96,6 +96,31 @@ bool intersects_aabb(Ray ray, AABB aabb) {
 
 float intersects_plane(Ray ray, Plane plane) {
   return (-plane.d - dot(plane.normal, ray.origin)) / dot(plane.normal, ray.direction);
+}
+
+float intersects_triangle(Ray ray, Triangle triangle) {
+    vec3 e1 = triangle.p2 - triangle.p1;
+    vec3 e2 = triangle.p3 - triangle.p1;
+    vec3 p = cross(ray.direction, e2);
+    float det = dot(e1, p);
+
+    if (det >= EPSILON && det < EPSILON) {
+        return 1.0 / 0.0;
+    }
+
+    float inv_det = 1.0 / det;
+    vec3 tk = ray.origin - triangle.p1;
+    float u = dot(tk,p) * inv_det;
+    if (u < 0.0 || u > 1.0) {
+        return 1.0 / 0.0;
+    }
+    vec3 q = cross(tk,e1);
+    float v = dot(ray.direction, q) * inv_det;
+    if (v < 0.0 || u + v > 1.0) {
+        return 1.0 / 0.0;
+    }
+    float t = dot(e2, q) * inv_det;
+    return t; 
 }
 
 
@@ -154,8 +179,7 @@ Ray generate_ray(vec2 uv) {
 }
 
 
-vec3 diffuse_reflection(inout uint seed)
-{
+vec3 diffuse_reflection(inout uint seed) {
 	// based on SmallVCM / GIC
     float r1 = next_float_lcg(seed);
     float r2 = next_float_lcg(seed);
@@ -166,8 +190,7 @@ vec3 diffuse_reflection(inout uint seed)
 	return R;
 }
 
-vec3 local_to_world(const vec3 V, const vec3 N )
-{
+vec3 local_to_world(const vec3 V, const vec3 N ) {
 	// based on SmallVCM
 	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
 	vec3 B = normalize( cross( N, tmp ) );
@@ -175,13 +198,13 @@ vec3 local_to_world(const vec3 V, const vec3 N )
 	return V.x * T + V.y * B + V.z * N;
 }
 
-vec3 world_to_local(const vec3 V, const vec3 N )
-{
+vec3 world_to_local(const vec3 V, const vec3 N ) {
 	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
 	vec3 B = normalize( cross( N, tmp ) );
 	vec3 T = cross( B, N );
 	return vec3( dot( V, T ), dot( V, B ), dot( V, N ) );
 }
+
 
 vec3 diffuse_reflection_cos(inout uint seed)
 {
@@ -210,9 +233,14 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
         if (t_new < t) { t = t_new; best_j = j; typ = 0; }
       }
 
+      for (int j = 0; j < num_triangles; j++) {
+        float t_new = intersects_triangle(ray, triangles[j]);
+        if (t_new < t) { t = t_new; best_j = j; typ = 1; }
+      }
+
       for (int j = 0; j < num_spheres; j++) {
         float t_new = intersects_sphere(ray, spheres[j]);
-        if (t_new < t) { t = t_new; best_j = j; typ = 1; }
+        if (t_new < t) { t = t_new; best_j = j; typ = 2; }
       }
 
 
@@ -221,7 +249,12 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
         break;
       }
 
-      Material material = typ == 0 ? planes[best_j].material : spheres[best_j].material;
+      Material material;
+      switch (typ) {
+        case 0: material = planes[best_j].material; break;
+        case 1: material = triangles[best_j].material; break;
+        case 2: material = spheres[best_j].material; break;
+      }
 
       if (material.emissive == 1) {
         emit += trans * material.diffuse;

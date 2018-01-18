@@ -18,11 +18,12 @@ pub struct ComputePart<I: 'static + ImageViewAccess + Send + Sync> {
     input_pool: CpuBufferPool<tracer::ty::Input>,
     spheres: Arc<CpuAccessibleBuffer<[tracer::ty::Sphere]>>,
     planes: Arc<CpuAccessibleBuffer<[tracer::ty::Plane]>>,
+    triangles: Arc<CpuAccessibleBuffer<[tracer::ty::Triangle]>>,
     accum: Arc<CpuAccessibleBuffer<[[f32;4]]>>,
 }
 
 impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
-    pub fn new(device: &Arc<Device>, image: Arc<I>, spheres: Vec<tracer::ty::Sphere>, planes: Vec<tracer::ty::Plane>, family: QueueFamily) -> ComputePart<I> {
+    pub fn new(device: &Arc<Device>, image: Arc<I>, spheres: Vec<tracer::ty::Sphere>, planes: Vec<tracer::ty::Plane>, triangles: Vec<tracer::ty::Triangle>, family: QueueFamily) -> ComputePart<I> {
         let shader = tracer::Shader::load(device.clone()).expect("failed to create shader module");
         let pipeline = Arc::new(
             ComputePipeline::new(device.clone(), &shader.main_entry_point(), &())
@@ -32,6 +33,7 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
         let input_pool = CpuBufferPool::uniform_buffer(device.clone());
         let spheres = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), spheres.into_iter()).unwrap();
         let planes = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), planes.into_iter()).unwrap();
+        let triangles = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), triangles.into_iter()).unwrap();
 
         let accum = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), (0..512*512).map(|_|[0.;4])).unwrap();
 
@@ -41,6 +43,7 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
             input_pool,
             spheres,
             planes,
+            triangles,
             accum,
         }
     }
@@ -73,6 +76,7 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
                 .add_buffer(self.input_pool.next(input).unwrap()).unwrap()
                 .add_buffer(self.spheres.clone()).unwrap()
                 .add_buffer(self.planes.clone()).unwrap()
+                .add_buffer(self.triangles.clone()).unwrap()
                 .add_buffer(self.accum.clone()).unwrap()
                 .build()
                 .unwrap(),
