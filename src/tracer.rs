@@ -193,7 +193,7 @@ vec3 diffuse_reflection_cos(inout uint seed)
 	return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
 }
 
-vec3 trace(Ray ray, inout uint seed) {
+vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
 
@@ -233,10 +233,18 @@ vec3 trace(Ray ray, inout uint seed) {
       vec3 normal = typ == 0 ? planes[best_j].normal : normalize(intersection - spheres[best_j].position);
 
       ray.origin = intersection + normal * EPSILON;
-      ray.direction = local_to_world(diffuse_reflection(seed), normal);
       vec3 brdf = material.diffuse * (1.0 / PI);
-      float pdf = 1.0 / (2.0 * PI);
-      float cos_i = dot(ray.direction, normal);
+      float cos_i;
+      float pdf;
+      if (importance_sampling) {
+        ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
+        cos_i = dot(ray.direction, normal);
+        pdf = cos_i / PI;
+      } else {
+        ray.direction = local_to_world(diffuse_reflection(seed), normal);
+        cos_i = dot(ray.direction, normal);
+        pdf = 1.0 / (2.0 * PI);
+      }
       trans *= brdf * cos_i / pdf;
 
     }
@@ -265,8 +273,9 @@ void main() {
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
 
     Ray ray = generate_ray(uv);
-    
-    vec3 color = trace(ray, seed);
+   
+    bool importance_sampling = gl_GlobalInvocationID.x > 255;
+    vec3 color = trace(ray, seed, importance_sampling);
 
     accum[idx] += color;
     vec3 outCol = accum[idx] / float(frame_num);
