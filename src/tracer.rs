@@ -27,13 +27,6 @@ struct Node {
   uint shape_index;
 };
 
-
-struct Triangle {
-  vec3 p1;
-  vec3 p2;
-  vec3 p3;
-};
-
 // simple. no frensel term yet
 struct Material {
   // if emissive, then refl is the amount of light
@@ -41,6 +34,19 @@ struct Material {
   float refl;
   vec3  diffuse;
 };
+
+struct Plane {
+    vec3 normal;
+    float d;
+    Material material;
+};
+
+struct Triangle {
+  vec3 p1;
+  vec3 p2;
+  vec3 p3;
+};
+
 
 struct Camera {
   vec3 origin;
@@ -71,10 +77,12 @@ layout(        set = 0, binding = 0, rgba8) uniform writeonly image2D img;
 layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   Camera camera;
   uint num_spheres;
+  uint num_planes;
   int frame_num;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
-layout(        set = 0, binding = 3) buffer Accum     { vec3 accum[];       };
+layout(std140, set = 0, binding = 3) buffer Planes    { Plane  planes[];    };
+layout(        set = 0, binding = 4) buffer Accum     { vec3   accum[];     };
 
 //layout(std140, set = 0, binding = 3) buffer Positions { vec3   positions[]; };
 //layout(std140, set = 0, binding = 4) buffer Indices   { uvec3  indices[];   };
@@ -84,6 +92,11 @@ layout(        set = 0, binding = 3) buffer Accum     { vec3 accum[];       };
 bool intersects_aabb(Ray ray, AABB aabb) {
   return false;
 }
+
+float intersects_plane(Ray ray, Plane plane) {
+  return (-plane.d - dot(plane.normal, ray.origin)) / dot(plane.normal, ray.direction);
+}
+
 
 float intersects_sphere(Ray ray, Sphere sphere) {
   vec3 distance = sphere.position - ray.origin;
@@ -160,19 +173,31 @@ vec3 trace(Ray ray, inout uint seed) {
     vec3 trans = vec3(1.0);
 
     for (int j = 0; j < 8; j++) {
+      int typ;
       int best_j;
       float t  = 1.0 / 0.0;
+
+      for (int j = 0; j < num_planes; j++) {
+        float t_new = intersects_plane(ray, planes[j]);
+        if (t_new < EPSILON) {
+          t_new = 1.0 / 0.0;
+        }
+        if (t_new < t) { t = t_new; best_j = j; typ = 0; }
+      }
+
       for (int j = 0; j < num_spheres; j++) {
         float t_new = intersects_sphere(ray, spheres[j]);
-        if (t_new < t) { t = t_new; best_j = j; }
+        if (t_new < t) { t = t_new; best_j = j; typ = 1; }
       }
+
+
       if (t >= 1.0 / 0.0) {
         emit = vec3(0.0);
         break;
       }
 
 
-      Material material = spheres[best_j].material;
+      Material material = typ == 0 ? planes[best_j].material : spheres[best_j].material;
 
       if (material.emissive == 1) {
         emit += trans * material.diffuse;
@@ -180,7 +205,9 @@ vec3 trace(Ray ray, inout uint seed) {
       }
 
       vec3 intersection = ray.origin + ray.direction * t;
-      vec3 normal = normalize(intersection - spheres[best_j].position);
+
+      vec3 normal = typ == 0 ? planes[best_j].normal : normalize(intersection - spheres[best_j].position);
+      //return abs(normal);
 
       ray.origin = intersection + normal * EPSILON;
       ray.direction = cosWeightedRandomHemisphereDirection(normal, seed);

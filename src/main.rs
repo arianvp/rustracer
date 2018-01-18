@@ -90,43 +90,111 @@ fn main() {
         graphics::GraphicsPart::new(device.clone(), &window, physical.clone(), queue.clone());
 
 
+    let planes = vec![
+        tracer::ty::Plane {
+            normal: [0., 1., 0.],
+            d: 0.,
+            material: tracer::ty::Material {
+                diffuse: [0.7, 0.7, 0.7],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
+        tracer::ty::Plane {
+            normal: [0., 0., -1.],
+            d: 8.,
+            material: tracer::ty::Material {
+                diffuse: [0.7, 0.7, 0.7],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
+        tracer::ty::Plane {
+            normal: [1., 0., 0.],
+            d: 0.,
+            material: tracer::ty::Material {
+                diffuse: [0.6, 0.0555, 0.062],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
+        tracer::ty::Plane {
+            normal: [0., -1., 0.],
+            d: 5.49,
+            material: tracer::ty::Material {
+                diffuse: [0.7, 0.7, 0.7],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
+        tracer::ty::Plane {
+            normal: [-1., 0., 0.],
+            d: 5.49,
+            material: tracer::ty::Material {
+                diffuse: [0.0, 0.7, 0.0],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
+    ];
+
+    let num_planes = planes.len() as u32;
 
     // TODO we should probably arc this?
     let spheres = vec![
         tracer::ty::Sphere {
-            position: [0.0; 3],
+            position: [4.9, 1.0, 0.3],
             radius: 0.5,
             material: tracer::ty::Material {
                 diffuse: [0.9, 0.0, 0.0],
                 refl: 0.0,
                 emissive: 0,
-                _dummy0: [0;8],
+                _dummy0: [0; 8],
             },
-            _dummy0: [0;4],
+            _dummy0: [0; 4],
         },
         tracer::ty::Sphere {
-            position: [1.4; 3],
-            radius: 0.5,
+            position: [1.4, 3.9, 1.2],
+            radius: 0.2,
             material: tracer::ty::Material {
-                diffuse: [1.0, 2.0, 1.0],
+                diffuse: [27.0, 13.0, 12.0],
                 refl: 0.0,
                 emissive: 1,
-                _dummy0: [0;8],
+                _dummy0: [0; 8],
             },
-            _dummy0: [0;4],
+            _dummy0: [0; 4],
         },
     ];
 
     let num_spheres = spheres.len() as u32;
 
-    let mut compute = compute::ComputePart::new(&device, graphics.texture.clone(), spheres, queue.family());
+    let mut compute = compute::ComputePart::new(
+        &device,
+        graphics.texture.clone(),
+        spheres,
+        planes,
+        queue.family(),
+    );
 
 
 
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
-    let mut camera =
-        tracer::ty::Camera::new(Vector3::new(0., 3., 5.), Vector3::new(0., 0., 0.), 20.);
+    let mut camera = tracer::ty::Camera::new(
+        Vector3::new(2.78, 2.73, -8.0),
+        Vector3::new(2.73, 2.73, 0.),
+        5.,
+    );
 
     let mut keycodes = HashSet::new();
     let mut frame_num = 1;
@@ -151,15 +219,14 @@ fn main() {
 
 
         let cb = {
-            let mut cbb =
-                AutoCommandBufferBuilder::new(device.clone(), queue.family())
-                    .unwrap();
+            let mut cbb = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
             cbb = compute.render(
                 cbb,
                 graphics.dimensions,
                 tracer::ty::Input {
                     camera,
                     num_spheres,
+                    num_planes,
                     frame_num,
                 },
             );
@@ -167,10 +234,13 @@ fn main() {
             cbb.build().unwrap()
         };
 
-        let future = previous_frame_end.join(acquire_future)
-            .then_execute(queue.clone(), cb).unwrap()
+        let future = previous_frame_end
+            .join(acquire_future)
+            .then_execute(queue.clone(), cb)
+            .unwrap()
             .then_swapchain_present(queue.clone(), graphics.swapchain.clone(), image_num)
-            .then_signal_fence_and_flush().unwrap();
+            .then_signal_fence_and_flush()
+            .unwrap();
 
         // lets wait until the frame is done, so we can access the buffer
         // and calculate its energy.
@@ -180,7 +250,7 @@ fn main() {
 
         previous_frame_end = Box::new(future) as Box<_>;
 
-        
+
         // TODO this is probably wrong
         events_loop.poll_events(|event| {
             match event {
@@ -191,10 +261,10 @@ fn main() {
                             match input.state {
                                 winit::ElementState::Pressed => {
                                     keycodes.insert(input.virtual_keycode.unwrap());
-                                },
+                                }
                                 winit::ElementState::Released => {
                                     keycodes.remove(&input.virtual_keycode.unwrap());
-                                },
+                                }
 
                             }
                         }
@@ -206,7 +276,7 @@ fn main() {
             }
         });
 
-        if !keycodes.is_empty() { 
+        if !keycodes.is_empty() {
             camera.handle_input(&keycodes);
             frame_num = 0;
         }
