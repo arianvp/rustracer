@@ -42,9 +42,9 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
         }
     }
     pub fn calculate_energy(&self, framenum: i32) -> f32 {
-        let content = self.scene.read().unwrap();
-        let energy = content.into_iter().fold(0.0, |x,y| x + y.radius);
-        return energy;
+        let content = self.accum.read().unwrap();
+        let x: f32 = content.into_iter().map(|x| x[0] + x[1] + x[2]).sum();
+        x / (framenum as f32)
     }
     /// when `scene` is not None, a new scene will be uploaded
     pub fn render(

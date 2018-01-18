@@ -133,7 +133,6 @@ fn main() {
     let mut fps_counter = FPSCounter::new();
 
     loop {
-        println!("frame_num: {:?}", frame_num);
         previous_frame_end.cleanup_finished();
 
         if graphics.recreate_swapchain(&window) {
