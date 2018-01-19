@@ -13,6 +13,22 @@ use std::collections::HashSet;
 #define INV_PI (1.0 / PI)
 #define EPSILON (0.0001)
 
+// wide hash + deep lcg from 
+// http://www.reedbeta.com/blog/quick-and-easy-gpu-random-numbers-in-d3d11/
+uint wang_hash(uint seed) {
+  seed = (seed ^ 61) ^ (seed >> 16);
+  seed *= 9;
+  seed = seed ^ (seed >> 4);
+  seed *= 0x27d4eb2d;
+  seed = seed ^ (seed >> 15);
+  return seed;
+}
+
+float next_float_lcg(inout uint state) {
+  state = 1664525 * state + 1013904223;
+  return state * (1.0 / 4294967296.0);
+}
+
 struct AABB {
   vec3 min;
   vec3 max;
@@ -98,6 +114,24 @@ float intersects_plane(Ray ray, Plane plane) {
   return (-plane.d - dot(plane.normal, ray.origin)) / dot(plane.normal, ray.direction);
 }
 
+vec3 random_point_on_triangle(const Triangle triangle, inout uint seed) {
+  float u = next_float_lcg(seed);
+  float v = next_float_lcg(seed);
+  v = (1.0 - u) * v;
+  vec3 e1 = triangle.p2 - triangle.p1;
+  vec3 e2 = triangle.p3 - triangle.p1;
+  return triangle.p1 + u * e1 + v * e2;
+}
+
+
+float triangle_area(const Triangle triangle) {
+  vec3 e1 = triangle.p2 - triangle.p1;
+  vec3 e2 = triangle.p3 - triangle.p1;
+  float l1 = length(e1);
+  float l2 = length(e2);
+  return 0.5 * (1.0 - dot(e1/l1, e2/l2)) * l1 * l2;
+}
+
 float intersects_triangle(Ray ray, Triangle triangle) {
     vec3 e1 = triangle.p2 - triangle.p1;
     vec3 e2 = triangle.p3 - triangle.p1;
@@ -153,22 +187,6 @@ float intersects_sphere(Ray ray, Sphere sphere) {
   return t0;
 }
 
-// wide hash + deep lcg from 
-// http://www.reedbeta.com/blog/quick-and-easy-gpu-random-numbers-in-d3d11/
-uint wang_hash(uint seed) {
-  seed = (seed ^ 61) ^ (seed >> 16);
-  seed *= 9;
-  seed = seed ^ (seed >> 4);
-  seed *= 0x27d4eb2d;
-  seed = seed ^ (seed >> 15);
-  return seed;
-}
-
-float next_float_lcg(inout uint state) {
-  state = 1664525 * state + 1013904223;
-  return state * (1.0 / 4294967296.0);
-}
-
 
 Ray generate_ray(vec2 uv) {
   vec3 t = camera.p1 + uv.x * (camera.p2 - camera.p1) + uv.y * (camera.p3 - camera.p1);
@@ -216,33 +234,50 @@ vec3 diffuse_reflection_cos(inout uint seed)
 	return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
 }
 
-vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
+float intersect_shadow(const Ray ray) {
+    float t = 1.0 / 0.0;
+    for (int j = 0; j < num_spheres; j++) {
+      float t_new = intersects_sphere(ray, spheres[j]);
+      if (t_new < t)  t = t_new;
+    }
+    return t;
+}
+
+void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
+    // optimization. planes dont cast shadows
+    for (int j = 0; j < num_planes; j++) {
+      float t_new = intersects_plane(ray, planes[j]);
+      if (t_new < EPSILON) {
+        t_new = 1.0 / 0.0;
+      }
+      if (t_new < t) { t = t_new; best_j = j; typ = 0; }
+    }
+
+    for (int j = 0; j < num_triangles; j++) {
+      float t_new = intersects_triangle(ray, triangles[j]);
+      if (t_new < t) { t = t_new; best_j = j; typ = 1; }
+    }
+
+    for (int j = 0; j < num_spheres; j++) {
+      float t_new = intersects_sphere(ray, spheres[j]);
+      if (t_new < t) { t = t_new; best_j = j; typ = 2; }
+    }
+
+
+}
+
+vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
+
+    bool specular_bounce = true;
 
     for (int j = 0; j < 4; j++) {
       int typ;
       int best_j;
       float t  = 1.0 / 0.0;
 
-      for (int j = 0; j < num_planes; j++) {
-        float t_new = intersects_plane(ray, planes[j]);
-        if (t_new < EPSILON) {
-          t_new = 1.0 / 0.0;
-        }
-        if (t_new < t) { t = t_new; best_j = j; typ = 0; }
-      }
-
-      for (int j = 0; j < num_triangles; j++) {
-        float t_new = intersects_triangle(ray, triangles[j]);
-        if (t_new < t) { t = t_new; best_j = j; typ = 1; }
-      }
-
-      for (int j = 0; j < num_spheres; j++) {
-        float t_new = intersects_sphere(ray, spheres[j]);
-        if (t_new < t) { t = t_new; best_j = j; typ = 2; }
-      }
-
+      intersect(ray, typ, best_j, t);
 
       if (t >= 1.0 / 0.0) {
         emit = vec3(0.0);
@@ -257,7 +292,8 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
       }
 
       if (material.emissive == 1) {
-        emit += trans * material.diffuse;
+        if (specular_bounce) emit += trans * material.diffuse;
+        if (!nee) emit += trans * material.diffuse;
         break;
       }
 
@@ -266,6 +302,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
       vec3 normal = typ == 0 ? planes[best_j].normal : normalize(intersection - spheres[best_j].position);
 
       ray.origin = intersection + normal * EPSILON;
+      specular_bounce = false; // TODO make dependent on speculaty
       vec3 brdf = material.diffuse * (1.0 / PI);
       float cos_i;
       float pdf;
@@ -279,6 +316,25 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling) {
         pdf = 1.0 / (2.0 * PI);
       }
       trans *= brdf * cos_i / pdf;
+
+      if (nee) {
+        vec3 pol = random_point_on_triangle(triangles[0], seed); // TODO random point on random light
+        vec3 ld = pol - ray.origin;
+        vec3 nld = normalize(ld);
+        float lt = length(ld);
+        Ray lr;
+        lr.origin = ray.origin + (EPSILON * nld);
+        lr.direction = nld;
+        if (!specular_bounce && intersect_shadow(lr) >= lt) {
+          vec3 nl = vec3(0.0, -1.0, 0.0);
+          float area = triangle_area(triangles[0]);
+          float solid_angle = (dot(nl,-nld ) * area) / (lt * lt);
+          float light_pdf = 1.0 / solid_angle;
+          emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse;
+        }
+      }
+
+
 
     }
 
@@ -302,13 +358,16 @@ void main() {
     // we want to decoralate pixels. Hashes are very suited for this
     seed = wang_hash(seed);
 
-
-    vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
+    float r0 = next_float_lcg(seed);
+    float r1 = next_float_lcg(seed);
+    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + vec2(r0, r1)) / imageSize(img);
 
     Ray ray = generate_ray(uv);
-   
-    bool importance_sampling = gl_GlobalInvocationID.x > 255;
-    vec3 color = trace(ray, seed, importance_sampling);
+  
+    // TODO make these constants?
+    bool importance_sampling = gl_GlobalInvocationID.x > 170;
+    bool nee = gl_GlobalInvocationID.x > (170*2);
+    vec3 color = trace(ray, seed, importance_sampling, nee);
 
     accum[idx] += color;
     vec3 outCol = accum[idx] / float(frame_num);
