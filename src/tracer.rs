@@ -117,7 +117,10 @@ float intersects_plane(Ray ray, Plane plane) {
 vec3 random_point_on_triangle(const Triangle triangle, inout uint seed) {
   float u = next_float_lcg(seed);
   float v = next_float_lcg(seed);
-  v = (1.0 - u) * v;
+  if (u + v >= 1.) {
+    u = (1 - u);
+    v = (1 - v);
+  }
   vec3 e1 = triangle.p2 - triangle.p1;
   vec3 e2 = triangle.p3 - triangle.p1;
   return triangle.p1 + u * e1 + v * e2;
@@ -198,40 +201,40 @@ Ray generate_ray(vec2 uv) {
 
 
 vec3 diffuse_reflection(inout uint seed) {
-	// based on SmallVCM / GIC
-    float r1 = next_float_lcg(seed);
-    float r2 = next_float_lcg(seed);
-	float term1 = 2 * PI * r1;
-	float term2 = 2 * sqrt( r2 * (1 - r2) );
-	vec3 R = vec3( cos( term1 ) * term2, sin( term1 ) * term2, 1 - 2 * r2 );
-	if (R.z < 0) R.z = -R.z;
-	return R;
+  // based on SmallVCM / GIC
+  float r1 = next_float_lcg(seed);
+  float r2 = next_float_lcg(seed);
+  float term1 = 2 * PI * r1;
+  float term2 = 2 * sqrt( r2 * (1 - r2) );
+  vec3 R = vec3( cos( term1 ) * term2, sin( term1 ) * term2, 1 - 2 * r2 );
+  if (R.z < 0) R.z = -R.z;
+  return R;
 }
 
 vec3 local_to_world(const vec3 V, const vec3 N ) {
-	// based on SmallVCM
-	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
-	vec3 B = normalize( cross( N, tmp ) );
-	vec3 T = cross( B, N );
-	return V.x * T + V.y * B + V.z * N;
+  // based on SmallVCM
+  vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
+  vec3 B = normalize( cross( N, tmp ) );
+  vec3 T = cross( B, N );
+  return V.x * T + V.y * B + V.z * N;
 }
 
 vec3 world_to_local(const vec3 V, const vec3 N ) {
-	vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
-	vec3 B = normalize( cross( N, tmp ) );
-	vec3 T = cross( B, N );
-	return vec3( dot( V, T ), dot( V, B ), dot( V, N ) );
+  vec3 tmp = (abs( N.x ) > 0.99f) ? vec3( 0, 1, 0 ) : vec3( 1, 0, 0 );
+  vec3 B = normalize( cross( N, tmp ) );
+  vec3 T = cross( B, N );
+  return vec3( dot( V, T ), dot( V, B ), dot( V, N ) );
 }
 
 
 vec3 diffuse_reflection_cos(inout uint seed)
 {
-	// based on SmallVCM
-    float r0 = next_float_lcg(seed);
-    float r1 = next_float_lcg(seed);
-	float term1 = 2 * PI * r0;
-	float term2 = sqrt( 1 - r1 );
-	return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
+  // based on SmallVCM
+   float r0 = next_float_lcg(seed);
+   float r1 = next_float_lcg(seed);
+  float term1 = 2 * PI * r0;
+  float term2 = sqrt( 1 - r1 );
+  return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
 }
 
 float intersect_shadow(const Ray ray) {
@@ -266,7 +269,7 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
 
 }
 
-vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
+vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light_sampling) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
 
@@ -304,14 +307,38 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
       }
 
       if (material.emissive == 1 && dot(ray.direction, normal) <= 0.0) {
-        if ((nee && specular_bounce) || !nee) {
+        if (!direct_light_sampling)
           emit += trans * material.diffuse;
-        }
+        if (direct_light_sampling && specular_bounce)
+          emit += trans * material.diffuse;
         break;
       }
-      ray.origin = intersection + normal * EPSILON;
-      specular_bounce = false; // TODO make dependent on speculaty
       vec3 brdf = material.diffuse * (1.0 / PI);
+      if (direct_light_sampling) {
+        vec3 pol = random_point_on_triangle(triangles[0], seed);
+        vec3 ld = (pol -  intersection);
+        float dist = length(ld);
+        vec3 nld = normalize(ld);
+        vec3 e1 = triangles[0].p2 - triangles[0].p1;
+        vec3 e2 = triangles[0].p3 - triangles[0].p1;
+        vec3 nl = -normalize(cross(e1, e2));
+        float cos_intersection = dot(normal, nld);
+        float cos_light = dot(-nl, nld);
+        Ray lr;
+        lr.origin = intersection + EPSILON * nld;
+        lr.direction = nld;
+          
+        if (cos_intersection > 0.0 && cos_light > 0.0 && intersect_shadow(lr) >= dist) {
+          float area = triangle_area(triangles[0]);
+          vec3 light_color = triangles[0].material.diffuse;
+          float solid_angle = (cos_light * area) / (dist * dist);
+          emit += (trans * solid_angle * cos_intersection * light_color * brdf);
+        }
+      }
+      specular_bounce = false; // TODO make dependent on speculaty
+
+
+      ray.origin = intersection + normal * EPSILON;
       float cos_i;
       float pdf;
       if (importance_sampling) {
@@ -323,27 +350,32 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
         cos_i = dot(ray.direction, normal);
         pdf = 1.0 / (2.0 * PI);
       }
-      trans *= brdf * cos_i / pdf;
 
-      if (nee) {
+      float mis_pdf = pdf;
+      trans *= (cos_i / mis_pdf) * brdf;
+
+
+      // trans *= brdf * cos_i / pdf;
+      /*if (direct_light_sampling && !specular_bounce) {
         vec3 pol = random_point_on_triangle(triangles[0], seed); // TODO random point on random light
-        vec3 ld = pol - ray.origin;
+        vec3 ld = pol - intersection;
         vec3 nld = normalize(ld);
-        float lt = length(ld);
+        float dist = length(ld);
         Ray lr;
-        lr.origin = ray.origin + (EPSILON * nld);
+        lr.origin = intersection; // + (EPSILON * nld);
         lr.direction = nld;
         vec3 e1 = triangles[0].p2 - triangles[0].p1;
         vec3 e2 = triangles[0].p3 - triangles[0].p1;
         vec3 nl = -normalize(cross(e1, e2));
-        if (dot(normal, nld) > 0 && dot(nl, -nld) > 0 && intersect_shadow(lr) >= lt) {
+        if (dot(normal, nld) > 0 && dot(nl, -nld) > 0 && intersect_shadow(lr) >= dist) {
           float area = triangle_area(triangles[0]);
-          float solid_angle = clamp((dot(nl,-nld ) * area) / (lt * lt), 0.0, 1.0);
+          float solid_angle = (dot(nl,-nld ) * area) / (dist * dist);
           float light_pdf = 1.0 / solid_angle;
-          emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse;
+          float mis_pdf = light_pdf + pdf;
+          emit += trans * (dot(normal, nld) / mis_pdf) * brdf * triangles[0].material.diffuse * (0.5 *
+          //emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse / (0.5 * PI);
         }
-      }
-
+      }*/
 
 
     }
@@ -376,8 +408,8 @@ void main() {
   
     // TODO make these constants?
     bool importance_sampling = true;
-    bool nee = true;// gl_GlobalInvocationID.x > 255;
-    vec3 color = trace(ray, seed, importance_sampling, nee);
+    bool direct_light_sampling =  true;// gl_GlobalInvocationID.x > 255;
+    vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling);
 
     accum[idx] += color;
     vec3 outCol = accum[idx] / float(frame_num);
@@ -491,7 +523,7 @@ impl ty::Camera {
 }
 
 // extend:  find t for every ray
-// shade: evaluate material at every t  (And do we need a shadow ray, and do we need to quit or not (russian))
+// shade: evaluate material at every t  (And do we direct_light_samplingd a shadow ray, and do we direct_light_samplingd to quit or not (russian))
 //  -> shadow rays
 //  -> path continuationrays
 // connect   (will only trace shadow rays)     (is the only one that plot to the screen. Only shadow rays contribute)  (though not true for mirrors)
