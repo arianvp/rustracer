@@ -93,9 +93,9 @@ fn main() {
     let triangles = vec![
         tracer::ty::Triangle {
 
-            p1: [3.9,  3.4, 3.0],
-            p2: [4.9,  3.4, 3.0],
-            p3: [3.13, 3.4, 2.0],
+            p1: [3.9,  5.4, 3.0],
+            p2: [4.9,  5.4, 3.0],
+            p3: [3.13, 5.4, 2.0],
             material: tracer::ty::Material {
                 diffuse: [17., 17., 17.],
                 refl: 0.0,

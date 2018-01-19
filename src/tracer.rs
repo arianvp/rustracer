@@ -295,21 +295,20 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
       vec3 normal;
       switch (typ) {
         case 0: normal = planes[best_j].normal; break;
-        case 1: normal = normalize(intersection - spheres[best_j].position); break;
-        case 2:
+        case 1:
           vec3 e1 = triangles[best_j].p2 - triangles[best_j].p1;
           vec3 e2 = triangles[best_j].p3 - triangles[best_j].p1;
-          normal = normalize(cross(e1, e2));
+          normal = -normalize(cross(e1, e2));
           break;
+        case 2: normal = normalize(intersection - spheres[best_j].position); break;
       }
 
-      if (material.emissive == 1) {
-        emit += trans * material.diffuse;
+      if (material.emissive == 1 && dot(ray.direction, normal) <= 0.0) {
+        if ((nee && specular_bounce) || !nee) {
+          emit += trans * material.diffuse;
+        }
         break;
       }
-
-
-
       ray.origin = intersection + normal * EPSILON;
       specular_bounce = false; // TODO make dependent on speculaty
       vec3 brdf = material.diffuse * (1.0 / PI);
@@ -326,7 +325,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
       }
       trans *= brdf * cos_i / pdf;
 
-      /*if (nee) {
+      if (nee) {
         vec3 pol = random_point_on_triangle(triangles[0], seed); // TODO random point on random light
         vec3 ld = pol - ray.origin;
         vec3 nld = normalize(ld);
@@ -336,14 +335,14 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
         lr.direction = nld;
         vec3 e1 = triangles[0].p2 - triangles[0].p1;
         vec3 e2 = triangles[0].p3 - triangles[0].p1;
-        vec3 nl = normalize(cross(e1, e2));
+        vec3 nl = -normalize(cross(e1, e2));
         if (dot(normal, nld) > 0 && dot(nl, -nld) > 0 && intersect_shadow(lr) >= lt) {
           float area = triangle_area(triangles[0]);
           float solid_angle = clamp((dot(nl,-nld ) * area) / (lt * lt), 0.0, 1.0);
           float light_pdf = 1.0 / solid_angle;
           emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse;
         }
-      }*/
+      }
 
 
 
@@ -377,7 +376,7 @@ void main() {
   
     // TODO make these constants?
     bool importance_sampling = true;
-    bool nee = true; // gl_GlobalInvocationID.x > (170*2);
+    bool nee = true;// gl_GlobalInvocationID.x > 255;
     vec3 color = trace(ray, seed, importance_sampling, nee);
 
     accum[idx] += color;
