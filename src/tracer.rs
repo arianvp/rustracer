@@ -138,7 +138,7 @@ float intersects_triangle(Ray ray, Triangle triangle) {
     vec3 p = cross(ray.direction, e2);
     float det = dot(e1, p);
 
-    if (det >= EPSILON && det < EPSILON) {
+    if (det > -EPSILON && det < EPSILON) {
         return 1.0 / 0.0;
     }
 
@@ -291,15 +291,34 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
         case 2: material = spheres[best_j].material; break;
       }
 
+      vec3 intersection = ray.origin + ray.direction * t;
+      vec3 normal;
+      switch (typ) {
+        case 0: normal = planes[best_j].normal; break;
+        case 1: normal = normalize(intersection - spheres[best_j].position); break;
+        case 2:
+          vec3 e1 = triangles[best_j].p2 - triangles[best_j].p1;
+          vec3 e2 = triangles[best_j].p3 - triangles[best_j].p1;
+          normal = normalize(cross(e1, e2));
+          break;
+      }
+
       if (material.emissive == 1) {
-        if (specular_bounce) emit += trans * material.diffuse;
-        if (!nee) emit += trans * material.diffuse;
+        if (nee) {
+          if (specular_bounce) {
+            if (dot(ray.direction, normal) < 0.0) {
+              emit += trans * material.diffuse;
+            }
+          }
+        } else {
+            if (dot(ray.direction, normal) < 0.0) {
+              emit += trans * material.diffuse;
+            }
+        }
         break;
       }
 
-      vec3 intersection = ray.origin + ray.direction * t;
 
-      vec3 normal = typ == 0 ? planes[best_j].normal : normalize(intersection - spheres[best_j].position);
 
       ray.origin = intersection + normal * EPSILON;
       specular_bounce = false; // TODO make dependent on speculaty
@@ -325,10 +344,12 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
         Ray lr;
         lr.origin = ray.origin + (EPSILON * nld);
         lr.direction = nld;
-        if (!specular_bounce && intersect_shadow(lr) >= lt) {
-          vec3 nl = vec3(0.0, -1.0, 0.0);
+        vec3 e1 = triangles[0].p2 - triangles[0].p1;
+        vec3 e2 = triangles[0].p3 - triangles[0].p1;
+        vec3 nl = normalize(cross(e1, e2));
+        if (dot(normal, nld) > 0 && dot(nl, -nld) > 0 && intersect_shadow(lr) >= lt) {
           float area = triangle_area(triangles[0]);
-          float solid_angle = (dot(nl,-nld ) * area) / (lt * lt);
+          float solid_angle = clamp((dot(nl,-nld ) * area) / (lt * lt), 0.0, 1.0);
           float light_pdf = 1.0 / solid_angle;
           emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse;
         }
@@ -365,8 +386,8 @@ void main() {
     Ray ray = generate_ray(uv);
   
     // TODO make these constants?
-    bool importance_sampling = gl_GlobalInvocationID.x > 170;
-    bool nee = gl_GlobalInvocationID.x > (170*2);
+    bool importance_sampling = true;
+    bool nee = true; // gl_GlobalInvocationID.x > (170*2);
     vec3 color = trace(ray, seed, importance_sampling, nee);
 
     accum[idx] += color;
