@@ -304,17 +304,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
       }
 
       if (material.emissive == 1) {
-        if (nee) {
-          if (specular_bounce) {
-            if (dot(ray.direction, normal) < 0.0) {
-              emit += trans * material.diffuse;
-            }
-          }
-        } else {
-            if (dot(ray.direction, normal) < 0.0) {
-              emit += trans * material.diffuse;
-            }
-        }
+        emit += trans * material.diffuse;
         break;
       }
 
@@ -336,7 +326,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
       }
       trans *= brdf * cos_i / pdf;
 
-      if (nee) {
+      /*if (nee) {
         vec3 pol = random_point_on_triangle(triangles[0], seed); // TODO random point on random light
         vec3 ld = pol - ray.origin;
         vec3 nld = normalize(ld);
@@ -353,7 +343,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool nee) {
           float light_pdf = 1.0 / solid_angle;
           emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse;
         }
-      }
+      }*/
 
 
 
