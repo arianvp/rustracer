@@ -96,7 +96,7 @@ layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   uint num_spheres;
   uint num_planes;
   uint num_triangles;
-  int frame_num;
+  uint frame_num;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 layout(std140, set = 0, binding = 3) buffer Planes    { Plane  planes[];    };
@@ -237,8 +237,7 @@ vec3 diffuse_reflection_cos(inout uint seed)
   return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
 }
 
-float intersect_shadow(const Ray ray) {
-    float t = 1.0 / 0.0;
+float intersect_shadow(const Ray ray, float t) {
     for (int j = 0; j < num_spheres; j++) {
       float t_new = intersects_sphere(ray, spheres[j]);
       if (t_new < t)  t = t_new;
@@ -275,7 +274,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
     bool specular_bounce = true;
 
-    for (int j = 0; j < 12; j++) {
+    for (int j = 0; j < 24; j++) {
       int typ;
       int best_j;
       float t  = 1.0 / 0.0;
@@ -313,13 +312,41 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           emit += trans * material.diffuse;
         break;
       }
+
+      vec3 brdf = material.diffuse * (1.0 / PI);
+
+      if (direct_light_sampling) {
+        vec3 pol = random_point_on_triangle(triangles[0], seed);
+        vec3 L = (pol - intersection);
+
+        vec3 e1 = triangles[0].p2 - triangles[0].p1;
+        vec3 e2 = triangles[0].p3 - triangles[0].p1;
+        vec3 Nl = -normalize(cross(e1, e2));
+        float area = triangle_area(triangles[0]);
+        float dist = length(L);
+        L = normalize(L);
+
+        Ray lr;
+        lr.origin = intersection;
+        lr.direction = L;
+
+        float tl = intersect_shadow(lr, dist);
+        if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist && !specular_bounce) {
+            float solid_angle = clamp((dot(Nl, -L) * area) / (dist * dist), 0.0, 1.0);
+            vec3 Ld = triangles[0].material.diffuse * solid_angle * brdf * clamp(0.0, 1.0, dot(normal,L));
+            emit += trans * Ld;
+        }
+      }
+
+
       float r0 = next_float_lcg(seed);
       if (material.refl > r0) {
         ray.origin = intersection;
         ray.direction = reflect(ray.direction, normal);
         trans *= material.diffuse; 
+        specular_bounce = true;
       } else {
-        vec3 brdf = material.diffuse * (1.0 / PI);
+        specular_bounce = false;
 
         ray.origin = intersection + normal * EPSILON;
         float cos_i;
@@ -344,7 +371,11 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           }
         }
 
-        trans *= (cos_i / pdf) * brdf;
+        if (importance_sampling) {
+          trans *= PI * brdf;
+        } else {
+          trans *= (cos_i / pdf) * brdf;
+        }
       }
 
 
@@ -379,7 +410,7 @@ void main() {
     // TODO make these constants?
     
     bool importance_sampling = true;
-    bool direct_light_sampling =  true;// gl_GlobalInvocationID.x > 255;
+    bool direct_light_sampling =  gl_GlobalInvocationID.x > 255;
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 

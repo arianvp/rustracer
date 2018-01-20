@@ -47,7 +47,7 @@ impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
             accum,
         }
     }
-    pub fn calculate_energy(&self, framenum: i32) -> f32 {
+    pub fn calculate_energy(&self, framenum: u32) -> f32 {
         let content = self.accum.read().unwrap();
         let x: f32 = content.into_iter().map(|x| x[0] + x[1] + x[2]).sum();
         x / (framenum as f32)
