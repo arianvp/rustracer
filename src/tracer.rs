@@ -275,7 +275,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
     bool specular_bounce = true;
 
-    for (int j = 0; j < 4; j++) {
+    for (int j = 0; j < 12; j++) {
       int typ;
       int best_j;
       float t  = 1.0 / 0.0;
@@ -313,92 +313,39 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           emit += trans * material.diffuse;
         break;
       }
-      vec3 brdf = material.diffuse * (1.0 / PI);
-      if (direct_light_sampling) {
-        vec3 pol = random_point_on_triangle(triangles[0], seed);
-        vec3 ld = (pol -  intersection);
-        float dist = length(ld);
-        vec3 nld = normalize(ld);
-        vec3 e1 = triangles[0].p2 - triangles[0].p1;
-        vec3 e2 = triangles[0].p3 - triangles[0].p1;
-        vec3 nl = -normalize(cross(e1, e2));
-        float cos_intersection = dot(normal, nld);
-        float cos_light = dot(-nl, nld);
-        Ray lr;
-        lr.origin = intersection + EPSILON * nld;
-        lr.direction = nld;
-          
-        if (cos_intersection > 0.0 && cos_light > 0.0 && intersect_shadow(lr) >= dist) {
-        vec3 pol = random_point_on_triangle(triangles[0], seed); // TODO random point on random light
-        vec3 ld = pol - intersection;
-        vec3 nld = normalize(ld);
-        float dist = length(ld);
-        Ray lr;
-        lr.origin = intersection + (EPSILON * nld);
-        lr.direction = nld;
-        vec3 e1 = triangles[0].p2 - triangles[0].p1;
-        vec3 e2 = triangles[0].p3 - triangles[0].p1;
-        vec3 nl = -normalize(cross(e1, e2));
-        if (dot(normal, nld) > 0 && dot(nl, -nld) > 0 && intersect_shadow(lr) >= dist) {
-          float area = triangle_area(triangles[0]);
-          float solid_angle = clamp((dot(nl,-nld ) * area) / (dist * dist), 0.0, 1.0);
-          float light_pdf = 1.0 / solid_angle;
-          emit += trans * (clamp(dot(normal, nld),0.0,1.0) / light_pdf)* brdf * triangles[0].material.diffuse * (0.5 * PI);
-          //emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse / (0.5 * PI);
-        }
-        }
-      }
-      specular_bounce = false; // TODO make dependent on speculaty
-
-
-      ray.origin = intersection + normal * EPSILON;
-      float cos_i;
-      float pdf;
-      if (importance_sampling) {
-        ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
-        cos_i = dot(ray.direction, normal);
-        pdf = cos_i / PI;
+      float r0 = next_float_lcg(seed);
+      if (material.refl > r0) {
+        ray.origin = intersection;
+        ray.direction = reflect(ray.direction, normal);
+        trans *= material.diffuse; 
       } else {
-        ray.direction = local_to_world(diffuse_reflection(seed), normal);
-        cos_i = dot(ray.direction, normal);
-        pdf = 1.0 / (2.0 * PI);
-      }
+        vec3 brdf = material.diffuse * (1.0 / PI);
 
-      /*if (russian_roulette) {
-        float r0 = next_float_lcg(seed);
-        float survival = max(max(max(trans.x, trans.y),trans.z),0.1);
-        if (r0 < survival) {
-          trans /= survival;
+        ray.origin = intersection + normal * EPSILON;
+        float cos_i;
+        float pdf;
+        if (importance_sampling) {
+          ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
+          cos_i = dot(ray.direction, normal);
+          pdf = cos_i / PI;
         } else {
-          break;
+          ray.direction = local_to_world(diffuse_reflection(seed), normal);
+          cos_i = dot(ray.direction, normal);
+          pdf = 1.0 / (2.0 * PI);
         }
-      }*/
 
-      float mis_pdf = pdf;
-      trans *= (cos_i / mis_pdf) * brdf;
-
-
-      // trans *= brdf * cos_i / pdf;
-      /*if (direct_light_sampling && !specular_bounce) {
-        vec3 pol = random_point_on_triangle(triangles[0], seed); // TODO random point on random light
-        vec3 ld = pol - intersection;
-        vec3 nld = normalize(ld);
-        float dist = length(ld);
-        Ray lr;
-        lr.origin = intersection; // + (EPSILON * nld);
-        lr.direction = nld;
-        vec3 e1 = triangles[0].p2 - triangles[0].p1;
-        vec3 e2 = triangles[0].p3 - triangles[0].p1;
-        vec3 nl = -normalize(cross(e1, e2));
-        if (dot(normal, nld) > 0 && dot(nl, -nld) > 0 && intersect_shadow(lr) >= dist) {
-          float area = triangle_area(triangles[0]);
-          float solid_angle = clamp(dot(nl,-nld ) * area) / (dist * dist), 0.0, 1.0);
-          float light_pdf = 1.0 / solid_angle;
-          float mis_pdf = light_pdf + pdf;
-          emit += trans * (clamp(dot(normal, nld),0.0,1.0) / mis_pdf) * brdf * triangles[0].material.diffuse * (0.5 *
-          //emit += trans * (dot(normal, nld) / light_pdf) * brdf * triangles[0].material.diffuse / (0.5 * PI);
+        if (russian_roulette) {
+          float r0 = next_float_lcg(seed);
+          float survival = max(max(max(trans.x, trans.y),trans.z),0.1);
+          if (r0 < survival) {
+            trans /= survival;
+          } else {
+            break;
+          }
         }
-      }*/
+
+        trans *= (cos_i / pdf) * brdf;
+      }
 
 
     }
@@ -433,7 +380,7 @@ void main() {
     
     bool importance_sampling = true;
     bool direct_light_sampling =  true;// gl_GlobalInvocationID.x > 255;
-    bool russian_roulette = false;
+    bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 
     accum[idx] += color;

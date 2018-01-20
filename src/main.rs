@@ -184,6 +184,17 @@ fn main() {
             },
             _dummy0: [0; 4],
         },
+        tracer::ty::Sphere {
+            position: [3.2, 1.0, 0.3],
+            radius: 0.5,
+            material: tracer::ty::Material {
+                diffuse: [0.7, 0.8, 0.1],
+                refl: 0.9,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
         /*tracer::ty::Sphere {
             position: [1.4, 3.9, 1.2],
             radius: 0.7,
