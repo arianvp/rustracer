@@ -189,7 +189,7 @@ fn main() {
             radius: 0.5,
             material: tracer::ty::Material {
                 diffuse: [0.7, 0.8, 0.1],
-                refl: 0.0,
+                refl: 0.9,
                 emissive: 0,
                 _dummy0: [0; 8],
             },

@@ -246,7 +246,6 @@ float intersect_shadow(const Ray ray, float t) {
 }
 
 void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
-    // optimization. planes dont cast shadows
     for (int j = 0; j < num_planes; j++) {
       float t_new = intersects_plane(ray, planes[j]);
       if (t_new < EPSILON) {
@@ -331,7 +330,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         lr.direction = L;
 
         float tl = intersect_shadow(lr, dist);
-        if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist && !specular_bounce) {
+        if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist) {
             float solid_angle = clamp((dot(Nl, -L) * area) / (dist * dist), 0.0, 1.0);
             vec3 Ld = triangles[0].material.diffuse * solid_angle * brdf * clamp(0.0, 1.0, dot(normal,L));
             emit += trans * Ld;
@@ -363,7 +362,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
         if (russian_roulette) {
           float r0 = next_float_lcg(seed);
-          float survival = max(max(max(trans.x, trans.y),trans.z),0.1);
+          float survival = clamp(max(max(trans.x, trans.y),trans.z),0.1, 0.9);
           if (r0 < survival) {
             trans /= survival;
           } else {
@@ -371,11 +370,11 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           }
         }
 
-        if (importance_sampling) {
+        /*if (importance_sampling) {
           trans *= PI * brdf;
-        } else {
-          trans *= (cos_i / pdf) * brdf;
-        }
+        } else {*/
+          trans *= (cos_i * ( 1.0 / pdf)) * brdf;
+        /*}*/
       }
 
 
@@ -410,7 +409,7 @@ void main() {
     // TODO make these constants?
     
     bool importance_sampling = true;
-    bool direct_light_sampling =  gl_GlobalInvocationID.x > 255;
+    bool direct_light_sampling = false; gl_GlobalInvocationID.x > 255;
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 
