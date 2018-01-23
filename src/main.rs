@@ -12,6 +12,7 @@ extern crate winit;
 extern crate image;
 extern crate nalgebra;
 extern crate scoped_threadpool;
+extern crate obj;
 
 extern crate half;
 
