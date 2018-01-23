@@ -35,6 +35,8 @@ use winit::{Event, EventsLoop, WindowBuilder, WindowEvent};
 use std::fs::File;
 use std::io::BufReader;
 use obj::Obj;
+use bvh::bvh::BVH;
+use bvh::flat_bvh::*;
 
 
 fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
@@ -116,7 +118,9 @@ fn main() {
         BufReader::new(File::open("assets/cube.obj").expect("Failed to open .obj file."));
     let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
     let mut triangles: Vec<tracer::ty::Triangle> = obj.vertices;
-    //let bvh = BVH::build(&mut triangles);
+    let bvh = BVH::build(&mut triangles);
+    let nodes = bvh.flatten().into_iter().map(tracer::node_to_node).collect::<Vec<_>>();
+    let node_length = nodes.len();
 
     //let triangles = vec![ ];
 
@@ -125,16 +129,16 @@ fn main() {
     let planes = vec![
         tracer::ty::Plane {
             normal: [0., 1., 0.],
-            d: 0.,
+            d: 2.0,
             material: tracer::ty::Material {
-                diffuse: [0.7, 0.7, 0.7],
+                diffuse: [0.0, 0.7, 0.7],
                 refl: 0.0,
                 emissive: 0,
                 _dummy0: [0; 8],
             },
             _dummy0: [0; 4],
         },
-        tracer::ty::Plane {
+        /*tracer::ty::Plane {
             normal: [0., 0., -1.],
             d: 8.,
             material: tracer::ty::Material {
@@ -177,7 +181,7 @@ fn main() {
                 _dummy0: [0; 8],
             },
             _dummy0: [0; 4],
-        },
+        },*/
     ];
 
     let num_planes = planes.len() as u32;
@@ -227,6 +231,7 @@ fn main() {
         spheres,
         planes,
         triangles,
+        nodes,
         queue.family(),
     );
 
@@ -274,6 +279,8 @@ fn main() {
                     num_triangles,
                     frame_num,
                     light,
+                    node_length: node_length as u32,
+                    _dummy0: [0; 12],
                 },
             );
             cbb = graphics.draw(cbb, image_num);

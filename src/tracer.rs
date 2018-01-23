@@ -86,6 +86,7 @@ struct Sphere {
 struct Ray {
   vec3 origin;
   vec3 direction;
+  vec3 inv_direction;
 };
 
 
@@ -97,6 +98,7 @@ layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   uint num_planes;
   uint num_triangles;
   uint frame_num;
+  uint node_length;
   Triangle light;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
@@ -104,11 +106,48 @@ layout(std140, set = 0, binding = 3) buffer Planes    { Plane  planes[];    };
 layout(std140, set = 0, binding = 4) buffer Triangles { Triangle triangles[]; };
 layout(        set = 0, binding = 5) buffer Accum     { vec3   accum[];     };
 
-//layout(std140, set = 0, binding = 5) buffer BVH       { Node   nodes[];     };
-//layout(std140, set = 0, binding = 6) buffer Length    { uint   node_length; };
+layout(std140, set = 0, binding = 6) buffer BVH       { Node   nodes[];     };
 
 bool intersects_aabb(Ray ray, AABB aabb) {
-  return false;
+  float tx1 = (aabb.min.x - ray.origin.x) * ray.inv_direction.x;
+  float tx2 = (aabb.max.x - ray.origin.x) * ray.inv_direction.x;
+  
+  float tmin = min(tx1, tx2);
+  float tmax = max(tx1, tx2);
+  
+  float ty1 = (aabb.min.y - ray.origin.y) * ray.inv_direction.y;
+  float ty2 = (aabb.max.y - ray.origin.y) * ray.inv_direction.y;
+  
+  tmin = max(tmin, min(ty1, ty2));
+  tmax = min(tmax, max(ty1, ty2));
+  
+  float tz1 = (aabb.min.z - ray.origin.z) * ray.inv_direction.z;
+  float tz2 = (aabb.max.z - ray.origin.z) * ray.inv_direction.z;
+ 
+  tmin = max(tmin, min(tz1, tz2));
+  tmax = min(tmax, max(tz1, tz2));
+  
+  return tmax >= tmin && tmax >= 0.;
+}
+
+void intersect_bvh(Ray ray) {
+    float best_t;
+    uint best_j;
+    uint index = 0;
+    while (index < node_length) {
+        Node node = nodes[index];
+        if (node.entry_index == 4294967295) {
+            Triangle triangle = triangles[node.shape_index];
+            if (intersects_aabb(ray, node.aabb)) {
+             // TODO intersect triangle
+            }
+            index = node.exit_index;
+        } else if (intersects_aabb(ray, node.aabb)) {
+            index = node.entry_index;
+        } else {
+            index = node.exit_index;
+        }
+    }
 }
 
 float intersects_plane(Ray ray, Plane plane) {
@@ -196,7 +235,7 @@ Ray generate_ray(vec2 uv) {
   vec3 t = camera.p1 + uv.x * (camera.p2 - camera.p1) + uv.y * (camera.p3 - camera.p1);
   vec3 origin = camera.origin;
   vec3 direction = normalize(t - origin);
-  Ray ray = {origin, direction};
+  Ray ray = {origin, direction, vec3(1.0)/direction};
   return ray;
 }
 
@@ -242,6 +281,10 @@ float intersect_shadow(const Ray ray, float t) {
     for (int j = 0; j < num_spheres; j++) {
       float t_new = intersects_sphere(ray, spheres[j]);
       if (t_new < t)  t = t_new;
+    }
+    for (int j = 0; j < num_triangles; j++) {
+      float t_new = intersects_triangle(ray, triangles[j]);
+      if (t_new < t) { t = t_new; }
     }
     return t;
 }
@@ -338,6 +381,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         Ray lr;
         lr.origin = intersection;
         lr.direction = L;
+        lr.inv_direction = vec3(1.0)/lr.direction;
 
         float tl = intersect_shadow(lr, dist);
         if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist) {
@@ -352,6 +396,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
       if (material.refl > r0) {
         ray.origin = intersection;
         ray.direction = reflect(ray.direction, normal);
+        ray.inv_direction = 1.0/ray.direction;
         trans *= material.diffuse; 
         specular_bounce = true;
       } else {
@@ -362,10 +407,12 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         float pdf;
         if (importance_sampling) {
           ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
+          ray.inv_direction = vec3(1.0)/ray.direction;
           cos_i = dot(ray.direction, normal);
           pdf = cos_i / PI;
         } else {
           ray.direction = local_to_world(diffuse_reflection(seed), normal);
+          ray.inv_direction = vec3(1.0)/ray.direction;
           cos_i = dot(ray.direction, normal);
           pdf = 1.0 / (2.0 * PI);
         }
@@ -436,10 +483,29 @@ struct Dummy;
 use bvh::aabb::{AABB, Bounded};
 use bvh::ray::Intersection;
 use bvh::ray::Ray;
+use bvh::flat_bvh;
 use bvh::bounding_hierarchy::BHShape;
 use obj::*;
 use obj::raw::object::Polygon;
 
+fn aabb_to_aabb(aabb: AABB) -> ty::AABB {
+    ty::AABB {
+        _dummy0: [0;4],
+        min: [aabb.min.x, aabb.min.y, aabb.min.z],
+        max: [aabb.max.y, aabb.max.y, aabb.max.z],
+    }
+}
+
+pub fn node_to_node(node: flat_bvh::FlatNode) -> ty::Node {
+    ty::Node {
+        _dummy0: [0;4],
+        _dummy1: [0;4],
+        aabb: aabb_to_aabb(node.aabb),
+        entry_index: node.entry_index,
+        exit_index: node.exit_index,
+        shape_index: node.shape_index,
+    }
+}
 
 impl Bounded for ty::Triangle {
     fn aabb(&self) -> AABB {
