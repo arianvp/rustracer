@@ -97,6 +97,7 @@ layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   uint num_planes;
   uint num_triangles;
   uint frame_num;
+  Triangle light;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 layout(std140, set = 0, binding = 3) buffer Planes    { Plane  planes[];    };
@@ -254,6 +255,9 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
       if (t_new < t) { t = t_new; best_j = j; typ = 0; }
     }
 
+    float t_new = intersects_triangle(ray, light);
+    if (t_new < t) { t = t_new; best_j = -1; typ = -1; }
+
     for (int j = 0; j < num_triangles; j++) {
       float t_new = intersects_triangle(ray, triangles[j]);
       if (t_new < t) { t = t_new; best_j = j; typ = 1; }
@@ -290,11 +294,17 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         case 0: material = planes[best_j].material; break;
         case 1: material = triangles[best_j].material; break;
         case 2: material = spheres[best_j].material; break;
+        case -1: material = light.material; break;
       }
 
       vec3 intersection = ray.origin + ray.direction * t;
       vec3 normal;
       switch (typ) {
+        case -1:
+          vec3 e1_ = light.p2 - light.p1;
+          vec3 e2_ = light.p3 - light.p1;
+          normal = -normalize(cross(e1_, e2_));
+          break;
         case 0: normal = planes[best_j].normal; break;
         case 1:
           vec3 e1 = triangles[best_j].p2 - triangles[best_j].p1;
@@ -304,7 +314,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         case 2: normal = normalize(intersection - spheres[best_j].position); break;
       }
 
-      if (material.emissive == 1 && dot(ray.direction, normal) <= 0.0) {
+      if (material.emissive == 1 /*&& dot(ray.direction, normal) <= 0.0*/) {
         if (!direct_light_sampling)
           emit += trans * material.diffuse;
         if (direct_light_sampling && specular_bounce)
@@ -315,14 +325,14 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
       vec3 brdf = material.diffuse * (1.0 / PI);
 
       if (direct_light_sampling) {
-        vec3 pol = random_point_on_triangle(triangles[0], seed);
+        vec3 pol = random_point_on_triangle(light, seed);
         vec3 L = (pol - intersection);
 
-        vec3 e1 = triangles[0].p2 - triangles[0].p1;
-        vec3 e2 = triangles[0].p3 - triangles[0].p1;
+        vec3 e1 = light.p2 - light.p1;
+        vec3 e2 = light.p3 - light.p1;
         vec3 Nl = -normalize(cross(e1, e2));
-        float area = triangle_area(triangles[0]);
-        float dist = length(L);
+        float area = triangle_area(light);
+        float dist = length(L) - EPSILON;
         L = normalize(L);
 
         Ray lr;
@@ -332,7 +342,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         float tl = intersect_shadow(lr, dist);
         if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist) {
             float solid_angle = clamp((dot(Nl, -L) * area) / (dist * dist), 0.0, 1.0);
-            vec3 Ld = triangles[0].material.diffuse * solid_angle * brdf * clamp(0.0, 1.0, dot(normal,L));
+            vec3 Ld = light.material.diffuse * solid_angle * brdf * clamp(0.0, 1.0, dot(normal,L));
             emit += trans * Ld;
         }
       }
@@ -362,7 +372,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
         if (russian_roulette) {
           float r0 = next_float_lcg(seed);
-          float survival = clamp(max(max(trans.x, trans.y),trans.z),0.1, 0.9);
+          float survival = clamp(0.1, 1.0, max(max(trans.x, trans.y),trans.z));
           if (r0 < survival) {
             trans /= survival;
           } else {

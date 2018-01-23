@@ -90,7 +90,7 @@ fn main() {
         graphics::GraphicsPart::new(device.clone(), &window, physical.clone(), queue.clone());
 
 
-    let triangles = vec![
+    let light = 
         tracer::ty::Triangle {
 
             p1: [3.9,  5.4, 3.0],
@@ -106,8 +106,8 @@ fn main() {
             _dummy1: [0;4],
             _dummy2: [0;4],
             _dummy3: [0;4],
-        },
-    ];
+        };
+    let triangles = vec![ ];
 
     let num_triangles = triangles.len() as u32;
 
@@ -262,6 +262,7 @@ fn main() {
                     num_planes,
                     num_triangles,
                     frame_num,
+                    light,
                 },
             );
             cbb = graphics.draw(cbb, image_num);
