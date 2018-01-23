@@ -32,6 +32,9 @@ use vulkano::instance::{Instance, PhysicalDevice};
 use vulkano::sync::{GpuFuture, now};
 use vulkano_win::{VkSurfaceBuild, Window};
 use winit::{Event, EventsLoop, WindowBuilder, WindowEvent};
+use std::fs::File;
+use std::io::BufReader;
+use obj::Obj;
 
 
 fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
@@ -108,7 +111,14 @@ fn main() {
             _dummy2: [0;4],
             _dummy3: [0;4],
         };
-    let triangles = vec![ ];
+
+    let file_input =
+        BufReader::new(File::open("assets/cube.obj").expect("Failed to open .obj file."));
+    let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
+    let mut triangles: Vec<tracer::ty::Triangle> = obj.vertices;
+    //let bvh = BVH::build(&mut triangles);
+
+    //let triangles = vec![ ];
 
     let num_triangles = triangles.len() as u32;
 
