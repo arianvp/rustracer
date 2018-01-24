@@ -524,7 +524,7 @@ fn aabb_to_aabb(aabb: AABB) -> ty::AABB {
     ty::AABB {
         _dummy0: [0;4],
         min: [aabb.min.x, aabb.min.y, aabb.min.z],
-        max: [aabb.max.y, aabb.max.y, aabb.max.z],
+        max: [aabb.max.x, aabb.max.y, aabb.max.z],
     }
 }
 
