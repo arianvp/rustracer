@@ -99,9 +99,9 @@ fn main() {
     let light = 
         tracer::ty::Triangle {
 
-            p1: [3.9,  5.4, 3.0],
-            p2: [4.9,  5.4, 3.0],
-            p3: [3.13, 5.4, 2.0],
+            p1: [0.8,  8.0, 0.0],
+            p2: [0.9,  8.0, 0.0],
+            p3: [0.13, 8.0, 0.0],
             material: tracer::ty::Material {
                 diffuse: [25., 25., 25.],
                 refl: 0.0,
@@ -115,7 +115,7 @@ fn main() {
         };
 
     let file_input =
-        BufReader::new(File::open("assets/cube.obj").expect("Failed to open .obj file."));
+        BufReader::new(File::open("assets/teapot.obj").expect("Failed to open .obj file."));
     let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
     let mut triangles: Vec<tracer::ty::Triangle> = obj.vertices;
     let bvh = BVH::build(&mut triangles);
@@ -127,7 +127,7 @@ fn main() {
     let num_triangles = triangles.len() as u32;
 
     let planes = vec![
-        tracer::ty::Plane {
+        /*tracer::ty::Plane {
             normal: [0., 1., 0.],
             d: 2.0,
             material: tracer::ty::Material {
@@ -137,7 +137,7 @@ fn main() {
                 _dummy0: [0; 8],
             },
             _dummy0: [0; 4],
-        },
+        },*/
         /*tracer::ty::Plane {
             normal: [0., 0., -1.],
             d: 8.,
@@ -240,9 +240,11 @@ fn main() {
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
     let mut camera = tracer::ty::Camera::new(
-        Vector3::new(2.78, 2.73, -8.0),
-        Vector3::new(2.73, 2.73, 0.),
-        5.,
+        Vector3::new(0.0, 3.0, 5.0),
+        Vector3::new(0.0, 0.0, 0.0),
+        //Vector3::new(2.78, 2.73, -8.0),
+        //Vector3::new(2.73, 2.73, 0.),
+        20.,
     );
 
     let mut keycodes = HashSet::new();

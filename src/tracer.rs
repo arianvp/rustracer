@@ -127,28 +127,9 @@ bool intersects_aabb(Ray ray, AABB aabb) {
   tmin = max(tmin, min(tz1, tz2));
   tmax = min(tmax, max(tz1, tz2));
   
-  return tmax >= tmin && tmax >= 0.;
+  return tmax > tmin && tmax > 0.;
 }
 
-void intersect_bvh(Ray ray) {
-    float best_t;
-    uint best_j;
-    uint index = 0;
-    while (index < node_length) {
-        Node node = nodes[index];
-        if (node.entry_index == 4294967295) {
-            Triangle triangle = triangles[node.shape_index];
-            if (intersects_aabb(ray, node.aabb)) {
-             // TODO intersect triangle
-            }
-            index = node.exit_index;
-        } else if (intersects_aabb(ray, node.aabb)) {
-            index = node.entry_index;
-        } else {
-            index = node.exit_index;
-        }
-    }
-}
 
 float intersects_plane(Ray ray, Plane plane) {
   return (-plane.d - dot(plane.normal, ray.origin)) / dot(plane.normal, ray.direction);
@@ -277,16 +258,41 @@ vec3 diffuse_reflection_cos(inout uint seed)
   return vec3( cos( term1 ) * term2, sin( term1 ) * term2, sqrt( r1 ) );
 }
 
+
+// LOL FIX BVH
 float intersect_shadow(const Ray ray, float t) {
     for (int j = 0; j < num_spheres; j++) {
       float t_new = intersects_sphere(ray, spheres[j]);
       if (t_new < t)  t = t_new;
     }
-    for (int j = 0; j < num_triangles; j++) {
+    /*for (int j = 0; j < num_triangles; j++) {
       float t_new = intersects_triangle(ray, triangles[j]);
       if (t_new < t) { t = t_new; }
-    }
+    }*/
     return t;
+}
+
+void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ) {
+    uint index = 0;
+    while (index < node_length) {
+        Node node = nodes[index];
+        if (node.entry_index == 4294967295) {
+            Triangle triangle = triangles[node.shape_index];
+            if (intersects_aabb(ray, node.aabb)) {
+               float t = intersects_triangle(ray, triangle);
+               if (t < best_t) {
+                typ = 1;
+                best_t = t;
+                best_j = int(node.shape_index);
+               }
+            }
+            index = node.exit_index;
+        } else if (intersects_aabb(ray, node.aabb)) {
+            index = node.entry_index;
+        } else {
+            index = node.exit_index;
+        }
+    }
 }
 
 void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
@@ -301,10 +307,13 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
     float t_new = intersects_triangle(ray, light);
     if (t_new < t) { t = t_new; best_j = -1; typ = -1; }
 
-    for (int j = 0; j < num_triangles; j++) {
+    /*for (int j = 0; j < num_triangles; j++) {
       float t_new = intersects_triangle(ray, triangles[j]);
       if (t_new < t) { t = t_new; best_j = j; typ = 1; }
-    }
+    }*/
+   
+    intersect_bvh(ray, best_j, t, typ);
+
 
     for (int j = 0; j < num_spheres; j++) {
       float t_new = intersects_sphere(ray, spheres[j]);
@@ -314,18 +323,39 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
 
 }
 
+
 vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light_sampling, bool russian_roulette) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
 
     bool specular_bounce = true;
 
-    for (int j = 0; j < 24; j++) {
+    for (int j = 0; j < 1; j++) {
       int typ;
       int best_j;
       float t  = 1.0 / 0.0;
 
       intersect(ray, typ, best_j, t);
+
+      vec3 bvhcol = vec3(0.0);
+      uint index = 0;
+      uint depth = 0;
+      while (index < node_length) {
+        Node node = nodes[index];
+        if (node.entry_index == 4294967295) {
+            Triangle triangle = triangles[node.shape_index];
+            if (intersects_aabb(ray, node.aabb)) {
+               float t_ = intersects_triangle(ray, triangle);
+            }
+            index = node.exit_index;
+        } else if (intersects_aabb(ray, node.aabb)) {
+            index = node.entry_index;
+            bvhcol += vec3(0.0, 0.001, 0.0);
+        } else {
+            index = node.exit_index;
+        }
+      }
+      return bvhcol;
 
       if (t >= 1.0 / 0.0) {
         emit = vec3(0.0);
@@ -356,6 +386,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           break;
         case 2: normal = normalize(intersection - spheres[best_j].position); break;
       }
+      return abs(normal);
 
       if (material.emissive == 1 /*&& dot(ray.direction, normal) <= 0.0*/) {
         if (!direct_light_sampling)
@@ -375,7 +406,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         vec3 e2 = light.p3 - light.p1;
         vec3 Nl = -normalize(cross(e1, e2));
         float area = triangle_area(light);
-        float dist = length(L) - EPSILON;
+        float dist = length(L);
         L = normalize(L);
 
         Ray lr;
@@ -385,7 +416,8 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
         float tl = intersect_shadow(lr, dist);
         if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist) {
-            float solid_angle = clamp((dot(Nl, -L) * area) / (dist * dist), 0.0, 1.0);
+            //float solid_angle = clamp((dot(Nl, -L) * area) / (dist * dist), 0.0, 1.0);
+            float solid_angle = dot(Nl, -L) * area / (dist * dist);
             vec3 Ld = light.material.diffuse * solid_angle * brdf * clamp(0.0, 1.0, dot(normal,L));
             emit += trans * Ld;
         }
