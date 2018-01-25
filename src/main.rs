@@ -80,6 +80,11 @@ fn get_device(physical: &PhysicalDevice, window: &Window) -> (Arc<Device>, Arc<Q
 
 
 fn main() {
+    use std::env;
+
+    let obj_file = env::args().nth(1).unwrap();
+
+
     // find an instance of Vulkan that allows us to draw to a surface
     let instance = Instance::new(None, &vulkano_win::required_extensions(), None)
         .expect("No instance with surface extension");
@@ -99,9 +104,9 @@ fn main() {
     let light = 
         tracer::ty::Triangle {
 
-            p1: [0.8,  8.0, 0.0],
-            p2: [0.9,  8.0, 0.0],
-            p3: [0.13, 8.0, 0.0],
+            p1: [1.0,  8.0, 0.0],
+            p2: [1.5,  8.0, 0.0],
+            p3: [0.5, 8.0, 0.0],
             material: tracer::ty::Material {
                 diffuse: [25., 25., 25.],
                 refl: 0.0,
@@ -115,7 +120,7 @@ fn main() {
         };
 
     let file_input =
-        BufReader::new(File::open("assets/teapot.obj").expect("Failed to open .obj file."));
+        BufReader::new(File::open(obj_file).expect("Failed to open .obj file."));
     let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
     let mut triangles: Vec<tracer::ty::Triangle> = obj.vertices;
     let bvh = BVH::build(&mut triangles);
@@ -127,9 +132,9 @@ fn main() {
     let num_triangles = triangles.len() as u32;
 
     let planes = vec![
-        /*tracer::ty::Plane {
+        tracer::ty::Plane {
             normal: [0., 1., 0.],
-            d: 2.0,
+            d: 0.0,
             material: tracer::ty::Material {
                 diffuse: [0.0, 0.7, 0.7],
                 refl: 0.0,
@@ -137,10 +142,21 @@ fn main() {
                 _dummy0: [0; 8],
             },
             _dummy0: [0; 4],
-        },*/
-        /*tracer::ty::Plane {
+        },
+        tracer::ty::Plane {
+            normal: [0., -1., 0.],
+            d: 15.0,
+            material: tracer::ty::Material {
+                diffuse: [0.0, 0.7, 0.7],
+                refl: 0.0,
+                emissive: 0,
+                _dummy0: [0; 8],
+            },
+            _dummy0: [0; 4],
+        },
+        tracer::ty::Plane {
             normal: [0., 0., -1.],
-            d: 8.,
+            d: -8.,
             material: tracer::ty::Material {
                 diffuse: [0.7, 0.7, 0.7],
                 refl: 0.0,
@@ -151,7 +167,7 @@ fn main() {
         },
         tracer::ty::Plane {
             normal: [1., 0., 0.],
-            d: 0.,
+            d: 8.,
             material: tracer::ty::Material {
                 diffuse: [0.6, 0.0555, 0.062],
                 refl: 0.0,
@@ -161,19 +177,8 @@ fn main() {
             _dummy0: [0; 4],
         },
         tracer::ty::Plane {
-            normal: [0., -1., 0.],
-            d: 5.49,
-            material: tracer::ty::Material {
-                diffuse: [0.7, 0.7, 0.7],
-                refl: 0.0,
-                emissive: 0,
-                _dummy0: [0; 8],
-            },
-            _dummy0: [0; 4],
-        },
-        tracer::ty::Plane {
             normal: [-1., 0., 0.],
-            d: 5.49,
+            d: 8.,
             material: tracer::ty::Material {
                 diffuse: [0.0, 0.7, 0.0],
                 refl: 0.0,
@@ -181,7 +186,7 @@ fn main() {
                 _dummy0: [0; 8],
             },
             _dummy0: [0; 4],
-        },*/
+        },
     ];
 
     let num_planes = planes.len() as u32;
@@ -240,8 +245,8 @@ fn main() {
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
     let mut camera = tracer::ty::Camera::new(
-        Vector3::new(0.0, 3.0, 5.0),
-        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(0.0, 3.0, 20.0),
+        Vector3::new(0.0, 3.0, 1.0),
         //Vector3::new(2.78, 2.73, -8.0),
         //Vector3::new(2.73, 2.73, 0.),
         20.,
@@ -250,6 +255,7 @@ fn main() {
     let mut keycodes = HashSet::new();
     let mut frame_num = 1;
     let mut fps_counter = FPSCounter::new();
+    let mut debug = 1;
 
     loop {
         previous_frame_end.cleanup_finished();
@@ -282,6 +288,7 @@ fn main() {
                     frame_num,
                     light,
                     node_length: node_length as u32,
+                    debug,
                     _dummy0: [0; 12],
                 },
             );
@@ -316,7 +323,11 @@ fn main() {
                         WindowEvent::KeyboardInput { input, .. } => {
                             match input.state {
                                 winit::ElementState::Pressed => {
-                                    keycodes.insert(input.virtual_keycode.unwrap());
+                                    let keycode = input.virtual_keycode.unwrap();
+                                    if keycode == VirtualKeyCode::B {
+                                        debug = !debug;
+                                    }
+                                    keycodes.insert(keycode);
                                 }
                                 winit::ElementState::Released => {
                                     keycodes.remove(&input.virtual_keycode.unwrap());
@@ -332,7 +343,9 @@ fn main() {
             }
         });
 
+        use winit::VirtualKeyCode;
         if !keycodes.is_empty() {
+
             camera.handle_input(&keycodes);
             frame_num = 0;
         }

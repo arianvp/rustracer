@@ -100,6 +100,7 @@ layout(std140, set = 0, binding = 1       ) uniform readonly Input {
   uint frame_num;
   uint node_length;
   Triangle light;
+  int debug;
 };
 layout(std140, set = 0, binding = 2) buffer Spheres   { Sphere spheres[];   };
 layout(std140, set = 0, binding = 3) buffer Planes    { Plane  planes[];    };
@@ -272,7 +273,7 @@ float intersect_shadow(const Ray ray, float t) {
     return t;
 }
 
-void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ) {
+void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ, inout float bvh) {
     uint index = 0;
     while (index < node_length) {
         Node node = nodes[index];
@@ -289,13 +290,14 @@ void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ)
             index = node.exit_index;
         } else if (intersects_aabb(ray, node.aabb)) {
             index = node.entry_index;
+            bvh += 0.001;
         } else {
             index = node.exit_index;
         }
     }
 }
 
-void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
+void intersect(const Ray ray, inout int typ, inout int best_j, inout float t, inout float bvh) {
     for (int j = 0; j < num_planes; j++) {
       float t_new = intersects_plane(ray, planes[j]);
       if (t_new < EPSILON) {
@@ -312,7 +314,7 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t) {
       if (t_new < t) { t = t_new; best_j = j; typ = 1; }
     }*/
    
-    intersect_bvh(ray, best_j, t, typ);
+    intersect_bvh(ray, best_j, t, typ, bvh);
 
 
     for (int j = 0; j < num_spheres; j++) {
@@ -335,30 +337,13 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
       int best_j;
       float t  = 1.0 / 0.0;
 
-      intersect(ray, typ, best_j, t);
+      float bvh = 0.0;
 
-      vec3 bvhcol = vec3(0.0);
-      uint index = 0;
-      uint depth = 0;
-      while (index < node_length) {
-        Node node = nodes[index];
-        if (node.entry_index == 4294967295) {
-            Triangle triangle = triangles[node.shape_index];
-            if (intersects_aabb(ray, node.aabb)) {
-               float t_ = intersects_triangle(ray, triangle);
-            }
-            index = node.exit_index;
-        } else if (intersects_aabb(ray, node.aabb)) {
-            index = node.entry_index;
-            bvhcol += vec3(0.0, 0.001, 0.0);
-        } else {
-            index = node.exit_index;
-        }
-      }
-      return bvhcol;
+      intersect(ray, typ, best_j, t, bvh);
 
       if (t >= 1.0 / 0.0) {
         emit = vec3(0.0);
+        if (debug == 1) emit += vec3(0.0, bvh, 0.);
         break;
       }
 
@@ -386,7 +371,10 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           break;
         case 2: normal = normalize(intersection - spheres[best_j].position); break;
       }
-      return abs(normal);
+
+      // for debug
+      emit += abs(normal);
+      break;
 
       if (material.emissive == 1 /*&& dot(ray.direction, normal) <= 0.0*/) {
         if (!direct_light_sampling)
