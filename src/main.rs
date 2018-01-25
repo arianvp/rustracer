@@ -15,6 +15,7 @@ extern crate scoped_threadpool;
 extern crate obj;
 
 extern crate half;
+extern crate tobj;
 
 mod tracer;
 mod types;
@@ -25,6 +26,7 @@ use fps_counter::FPSCounter;
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::path::Path;
 use vulkano::buffer::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::device::{Device, DeviceExtensions, Queue};
@@ -104,25 +106,64 @@ fn main() {
     let light = 
         tracer::ty::Triangle {
 
-            p1: [1.0,  8.0, 0.0],
-            p2: [1.5,  8.0, 0.0],
-            p3: [0.5, 8.0, 0.0],
+            p1: [-4.0, 14.9, 5.0],
+            p2: [-4.0, 14.9, 3.0],
+            p3: [4.0,  14.0, 5.0],
             material: tracer::ty::Material {
                 diffuse: [25., 25., 25.],
                 refl: 0.0,
                 emissive: 1,
                 _dummy0: [0; 8],
             },
+            normal: [0.0, -1.0, 0.0],
             _dummy0: [0;4],
             _dummy1: [0;4],
             _dummy2: [0;4],
             _dummy3: [0;4],
+            _dummy4: [0;4],
         };
 
-    let file_input =
-        BufReader::new(File::open(obj_file).expect("Failed to open .obj file."));
-    let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
-    let mut triangles: Vec<tracer::ty::Triangle> = obj.vertices;
+   // let file_input =
+    //    BufReader::new(File::open(obj_file).expect("Failed to open .obj file."));
+    //let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
+   
+    let (models, materials) = tobj::load_obj(&Path::new(&obj_file)).unwrap();
+    let mesh = &models[0].mesh;
+
+    let positions: Vec<[f32;3]> = mesh.positions
+        .chunks(3)
+        .map(|i| [i[0], i[1], i[2]])
+        .collect();
+    let normals: Vec<[f32;3]> = mesh.normals
+        .chunks(3)
+        .map(|i| [i[0], i[1], i[2]])
+        .collect();
+
+    let mut triangles: Vec<tracer::ty::Triangle> = 
+        mesh
+        .indices.chunks(3) 
+        .map(|indices| {
+            tracer::ty::Triangle {
+                p1: positions[indices[0] as usize],
+                p2: positions[indices[1] as usize],
+                p3: positions[indices[2] as usize],
+                _dummy0: [0;4],
+                _dummy1: [0;4],
+                _dummy2: [0;4],
+                _dummy3: [0;4],
+                _dummy4: [0;4],
+                normal: normals[indices[0] as usize],
+                material: tracer::ty::Material {
+                    diffuse: [0.8, 0.8, 0.8],
+                    refl: 0.0,
+                    emissive: 0,
+                    _dummy0: [0; 8],
+                },
+            }
+        }).collect();
+
+
+   // let mut triangles: Vec<tracer::ty::Triangle> = obj.vertices;
     let bvh = BVH::build(&mut triangles);
     let nodes = bvh.flatten().into_iter().map(tracer::node_to_node).collect::<Vec<_>>();
     let node_length = nodes.len();
@@ -136,7 +177,7 @@ fn main() {
             normal: [0., 1., 0.],
             d: 0.0,
             material: tracer::ty::Material {
-                diffuse: [0.0, 0.7, 0.7],
+                diffuse: [0.8, 0.2, 0.2],
                 refl: 0.0,
                 emissive: 0,
                 _dummy0: [0; 8],
@@ -147,7 +188,7 @@ fn main() {
             normal: [0., -1., 0.],
             d: 15.0,
             material: tracer::ty::Material {
-                diffuse: [0.0, 0.7, 0.7],
+                diffuse: [0.7, 0.7, 0.7],
                 refl: 0.0,
                 emissive: 0,
                 _dummy0: [0; 8],
@@ -155,8 +196,8 @@ fn main() {
             _dummy0: [0; 4],
         },
         tracer::ty::Plane {
-            normal: [0., 0., -1.],
-            d: -8.,
+            normal: [0., 0., 1.],
+            d: 8.,
             material: tracer::ty::Material {
                 diffuse: [0.7, 0.7, 0.7],
                 refl: 0.0,
@@ -194,19 +235,8 @@ fn main() {
     // TODO we should probably arc this?
     let spheres = vec![
         tracer::ty::Sphere {
-            position: [4.9, 1.0, 0.3],
-            radius: 0.5,
-            material: tracer::ty::Material {
-                diffuse: [0.7, 0.8, 0.1],
-                refl: 0.0,
-                emissive: 0,
-                _dummy0: [0; 8],
-            },
-            _dummy0: [0; 4],
-        },
-        tracer::ty::Sphere {
-            position: [3.2, 1.0, 0.3],
-            radius: 0.5,
+            position: [6.2, 1.0, 0.3],
+            radius: 0.9,
             material: tracer::ty::Material {
                 diffuse: [0.7, 0.8, 0.1],
                 refl: 0.9,
@@ -215,17 +245,6 @@ fn main() {
             },
             _dummy0: [0; 4],
         },
-        /*tracer::ty::Sphere {
-            position: [1.4, 3.9, 1.2],
-            radius: 0.7,
-            material: tracer::ty::Material {
-                diffuse: [27.0, 13.0, 12.0],
-                refl: 0.0,
-                emissive: 1,
-                _dummy0: [0; 8],
-            },
-            _dummy0: [0; 4],
-        },*/
     ];
 
     let num_spheres = spheres.len() as u32;

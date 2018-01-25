@@ -61,6 +61,7 @@ struct Triangle {
   vec3 p1;
   vec3 p2;
   vec3 p3;
+  vec3 normal;
   Material material;
 };
 
@@ -163,23 +164,26 @@ float intersects_triangle(Ray ray, Triangle triangle) {
     vec3 p = cross(ray.direction, e2);
     float det = dot(e1, p);
 
-    if (det > -EPSILON && det < EPSILON) {
-        return 1.0 / 0.0;
+    if (det < EPSILON) {
+        return 1.0e34;
     }
 
     float inv_det = 1.0 / det;
     vec3 tk = ray.origin - triangle.p1;
     float u = dot(tk,p) * inv_det;
     if (u < 0.0 || u > 1.0) {
-        return 1.0 / 0.0;
+        return 1.0e34;
     }
     vec3 q = cross(tk,e1);
     float v = dot(ray.direction, q) * inv_det;
     if (v < 0.0 || u + v > 1.0) {
-        return 1.0 / 0.0;
+        return 1.0e34;
     }
     float t = dot(e2, q) * inv_det;
     return t; 
+    //} else {
+    // return 1.0e34;
+   // }
 }
 
 
@@ -187,12 +191,12 @@ float intersects_sphere(Ray ray, Sphere sphere) {
   vec3 distance = sphere.position - ray.origin;
   float tca = dot(distance, ray.direction);
   if (tca < 0.0) {
-    return 1.0 / 0.0;
+    return 1.0e34;
   }
   float  d2 = dot(distance, distance) - tca * tca;
   float r2 = sphere.radius * sphere.radius;
   if (d2 > r2) {
-    return 1.0 / 0.0;
+    return 1.0e34;
   }
 
   float thc = sqrt(r2 - d2);
@@ -206,7 +210,7 @@ float intersects_sphere(Ray ray, Sphere sphere) {
   if (t0 < 0.0) {
     t0 = t1;
     if (t0 < 0.0) {
-      return 1.0 / 0.0;
+      return 1.0e34;
     }
   }
   return t0;
@@ -260,19 +264,6 @@ vec3 diffuse_reflection_cos(inout uint seed)
 }
 
 
-// LOL FIX BVH
-float intersect_shadow(const Ray ray, float t) {
-    for (int j = 0; j < num_spheres; j++) {
-      float t_new = intersects_sphere(ray, spheres[j]);
-      if (t_new < t)  t = t_new;
-    }
-    /*for (int j = 0; j < num_triangles; j++) {
-      float t_new = intersects_triangle(ray, triangles[j]);
-      if (t_new < t) { t = t_new; }
-    }*/
-    return t;
-}
-
 void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ, inout float bvh) {
     uint index = 0;
     while (index < node_length) {
@@ -297,11 +288,24 @@ void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ,
     }
 }
 
+// LOL FIX BVH
+float intersect_shadow(const Ray ray, float t) {
+    for (int j = 0; j < num_spheres; j++) {
+      float t_new = intersects_sphere(ray, spheres[j]);
+      if (t_new < t)  t = t_new;
+    }
+    int best_j;
+    int typ;
+    float bvh;
+    intersect_bvh(ray, best_j, t, typ, bvh);
+    return t;
+}
+
 void intersect(const Ray ray, inout int typ, inout int best_j, inout float t, inout float bvh) {
     for (int j = 0; j < num_planes; j++) {
       float t_new = intersects_plane(ray, planes[j]);
       if (t_new < EPSILON) {
-        t_new = 1.0 / 0.0;
+        t_new = 1.0e34;
       }
       if (t_new < t) { t = t_new; best_j = j; typ = 0; }
     }
@@ -330,20 +334,21 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
 
-    bool specular_bounce = true;
-
-    for (int j = 0; j < 1; j++) {
+    for (int j = 0; j < 24; j++) {
       int typ;
       int best_j;
-      float t  = 1.0 / 0.0;
+      float t  = 1.0e34;
 
       float bvh = 0.0;
 
       intersect(ray, typ, best_j, t, bvh);
 
-      if (t >= 1.0 / 0.0) {
-        emit = vec3(0.0);
-        if (debug == 1) emit += vec3(0.0, bvh, 0.);
+      /*if (debug == 1) {
+        return vec3(0.0, bvh, 0.0);
+      }*/
+
+      if (t >= 1.0e3) {
+        emit = vec3(1.0);
         break;
       }
 
@@ -358,101 +363,48 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
       vec3 intersection = ray.origin + ray.direction * t;
       vec3 normal;
       switch (typ) {
-        case -1:
-          vec3 e1_ = light.p2 - light.p1;
-          vec3 e2_ = light.p3 - light.p1;
-          normal = -normalize(cross(e1_, e2_));
-          break;
+        case -1: normal = light.normal; break;
         case 0: normal = planes[best_j].normal; break;
-        case 1:
-          vec3 e1 = triangles[best_j].p2 - triangles[best_j].p1;
-          vec3 e2 = triangles[best_j].p3 - triangles[best_j].p1;
-          normal = -normalize(cross(e1, e2));
-          break;
+        case 1: normal = triangles[best_j].normal; break;
         case 2: normal = normalize(intersection - spheres[best_j].position); break;
       }
 
-      // for debug
-      emit += abs(normal);
-      break;
-
-      if (material.emissive == 1 /*&& dot(ray.direction, normal) <= 0.0*/) {
-        if (!direct_light_sampling)
-          emit += trans * material.diffuse;
-        if (direct_light_sampling && specular_bounce)
-          emit += trans * material.diffuse;
+      //if (debug == 1) return (normal * vec3(0.5)) + vec3(0.5);
+      if (material.emissive == 1 && dot(normal, ray.direction) <= 0.0) {
+        emit += trans * material.diffuse;
         break;
       }
 
       vec3 brdf = material.diffuse * (1.0 / PI);
 
-      if (direct_light_sampling) {
-        vec3 pol = random_point_on_triangle(light, seed);
-        vec3 L = (pol - intersection);
-
-        vec3 e1 = light.p2 - light.p1;
-        vec3 e2 = light.p3 - light.p1;
-        vec3 Nl = -normalize(cross(e1, e2));
-        float area = triangle_area(light);
-        float dist = length(L);
-        L = normalize(L);
-
-        Ray lr;
-        lr.origin = intersection;
-        lr.direction = L;
-        lr.inv_direction = vec3(1.0)/lr.direction;
-
-        float tl = intersect_shadow(lr, dist);
-        if (dot(normal,L) > 0 && dot(Nl, -L) > 0 && tl >= dist) {
-            //float solid_angle = clamp((dot(Nl, -L) * area) / (dist * dist), 0.0, 1.0);
-            float solid_angle = dot(Nl, -L) * area / (dist * dist);
-            vec3 Ld = light.material.diffuse * solid_angle * brdf * clamp(0.0, 1.0, dot(normal,L));
-            emit += trans * Ld;
-        }
-      }
-
-
       float r0 = next_float_lcg(seed);
-      if (material.refl > r0) {
-        ray.origin = intersection;
-        ray.direction = reflect(ray.direction, normal);
-        ray.inv_direction = 1.0/ray.direction;
-        trans *= material.diffuse; 
-        specular_bounce = true;
+      float cos_i;
+      float pdf;
+      if (importance_sampling) {
+        ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
+        ray.origin = intersection + ray.direction * 0.01;
+        ray.inv_direction = vec3(1.0)/ray.direction;
+        cos_i = dot(ray.direction, normal);
+        pdf = cos_i / PI;
       } else {
-        specular_bounce = false;
-
-        ray.origin = intersection + normal * EPSILON;
-        float cos_i;
-        float pdf;
-        if (importance_sampling) {
-          ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
-          ray.inv_direction = vec3(1.0)/ray.direction;
-          cos_i = dot(ray.direction, normal);
-          pdf = cos_i / PI;
-        } else {
-          ray.direction = local_to_world(diffuse_reflection(seed), normal);
-          ray.inv_direction = vec3(1.0)/ray.direction;
-          cos_i = dot(ray.direction, normal);
-          pdf = 1.0 / (2.0 * PI);
-        }
-
-        if (russian_roulette) {
-          float r0 = next_float_lcg(seed);
-          float survival = clamp(0.1, 1.0, max(max(trans.x, trans.y),trans.z));
-          if (r0 < survival) {
-            trans /= survival;
-          } else {
-            break;
-          }
-        }
-
-        /*if (importance_sampling) {
-          trans *= PI * brdf;
-        } else {*/
-          trans *= (cos_i * ( 1.0 / pdf)) * brdf;
-        /*}*/
+        ray.direction = local_to_world(diffuse_reflection(seed), normal);
+        ray.origin = intersection + ray.direction * 0.01;
+        ray.inv_direction = vec3(1.0)/ray.direction;
+        cos_i = dot(ray.direction, normal);
+        pdf = 1.0 / (2.0 * PI);
       }
+
+      if (russian_roulette) {
+        float r0 = next_float_lcg(seed);
+        float survival = clamp(0.1, 1.0, max(max(trans.x, trans.y),trans.z));
+        if (r0 < survival) {
+          trans /= survival;
+        } else {
+          break;
+        }
+      }
+
+      trans *= (cos_i * ( 1.0 / pdf)) * brdf;
 
 
     }
@@ -484,13 +436,15 @@ void main() {
     Ray ray = generate_ray(uv);
   
     // TODO make these constants?
+    //
+    // TODO clamp reflective services
     
     bool importance_sampling = true;
     bool direct_light_sampling = false; gl_GlobalInvocationID.x > 255;
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 
-    accum[idx] += color;
+    accum[idx] +=  color;
     vec3 outCol = accum[idx] / float(frame_num);
     imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(outCol, 1.0));
 
@@ -555,7 +509,7 @@ impl BHShape for ty::Triangle {
     }
 }
 
-   
+/* 
 impl FromRawVertex for ty::Triangle {
     fn process(vertices: Vec<(f32, f32, f32, f32)>,
                _: Vec<(f32, f32, f32)>,
@@ -581,7 +535,7 @@ impl FromRawVertex for ty::Triangle {
                         p2: [second.0, second.1, second.2],
                         p3: [ third.0,  third.1,  third.2],
                         material: ty::Material{
-                            diffuse: [0.3;3],
+                            diffuse: [0.7, 0.2, 0.7],
                             emissive: 0,
                             refl: 0.0,
                             _dummy0: [0;8],
@@ -611,7 +565,7 @@ impl FromRawVertex for ty::Triangle {
         }
         Ok((triangles, Vec::new()))
     }
-}
+}*/
 
 impl ty::Camera {
     pub fn new(origin: Vector3<f32>, target: Vector3<f32>, focal_distance: f32) -> ty::Camera {
@@ -652,6 +606,8 @@ impl ty::Camera {
         let right = unit_y.cross(&direction);
         self.right = right.into();
         let up = direction.cross(&right);
+        println!("{:?}", up);
+        println!("{:?}", right);
         self.up = up.into();
 
         let c = origin + self.focal_distance * direction;
