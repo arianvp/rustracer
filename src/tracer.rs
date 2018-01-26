@@ -333,7 +333,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
     bool last_specular  = true;
-
+    float absorb_distance = 0.0;
     for (int j = 0; j < 4; j++) {
       int typ;
       int best_j;
@@ -420,18 +420,32 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         }
                 
         float r0 = (n1-n2)/(n1+n2); r0 *= r0;
+
+        
 		float fresnel = r0 + (1.-r0) * pow(1.0-abs(ndotr),5.);
+
         
         
         if( next_float_lcg(seed) < fresnel ) {
+            // full internal reflection
+            if (!outside) {
+                absorb_distance += t;
+            }
             ray.direction = reflect( ray.direction, normal );
         } else {
             ray.direction = refract( ray.direction, normal, n2/n1 );
+            //trans *= material.diffuse;
+            // keep track of how far we're in the medium
+            if (outside) {
+                absorb_distance = 0.0;
+            } else {
+                absorb_distance += t;
+            }
+            trans *= exp(material.diffuse * -absorb_distance);
         }
         ray.origin = intersection + (ray.direction * EPSILON);
         ray.inv_direction = (1.0 / ray.direction);
         // TODO beer
-        trans *= material.diffuse;
         
       } else if (r0 < material.refl) {
         last_specular = true;
@@ -509,6 +523,11 @@ void main() {
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 
+    float l = length(color);
+    if (l > 5.0) {
+        color /= l;
+        color *= 5.0;
+    }
     accum[idx] +=  color;
     vec3 outCol = accum[idx] / float(frame_num);
     imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(outCol, 1.0));

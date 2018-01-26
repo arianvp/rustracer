@@ -164,7 +164,7 @@ fn main() {
 
                 },
                 material: tracer::ty::Material {
-                    diffuse: [0.7, 0.1, 0.7],
+                    diffuse: [1.0, 0.71, 0.29],
                     refl: 0.3,
                     emissive: 0,
                     n: 0.0,
@@ -255,7 +255,7 @@ fn main() {
             position: [0.5, 2.0, 10.0],
             radius: 1.5,
             material: tracer::ty::Material {
-                diffuse: [0.7, 0.0, 0.7],
+                diffuse: [0.4, 3.0, 0.2],
                 refl: 0.0,
                 emissive: 0,
                 n: 1.66,
