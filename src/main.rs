@@ -110,7 +110,7 @@ fn main() {
             p2: [-4.0, 14.9, 3.0],
             p3: [4.0,  14.0, 5.0],
             material: tracer::ty::Material {
-                diffuse: [25., 25., 25.],
+                diffuse: [25., 25., 22.],
                 refl: 0.0,
                 emissive: 1,
                 _dummy0: [0; 8],
@@ -143,22 +143,32 @@ fn main() {
         mesh
         .indices.chunks(3) 
         .map(|indices| {
+            let p1 = positions[indices[0] as usize];
+            let p2 = positions[indices[1] as usize];
+            let p3 = positions[indices[2] as usize];
             tracer::ty::Triangle {
-                p1: positions[indices[0] as usize],
-                p2: positions[indices[1] as usize],
-                p3: positions[indices[2] as usize],
-                _dummy0: [0;4],
-                _dummy1: [0;4],
-                _dummy2: [0;4],
-                _dummy3: [0;4],
-                _dummy4: [0;4],
-                normal: normals[indices[0] as usize],
+                p1,
+                p2,
+                p3,
+                normal: if /*normals.len() > 0*/ false { normals[indices[0] as usize] } else { 
+                    let p1 = Vector3::from(p1);
+                    let p2 = Vector3::from(p2);
+                    let p3 = Vector3::from(p3);
+
+                    let e1 = (p2 - p1);
+                    let e2 = (p3 - p1);
+
+                    let res = e1.cross(&e2).normalize();
+                    [res.x, res.y, res.z]
+
+                },
                 material: tracer::ty::Material {
-                    diffuse: [0.8, 0.8, 0.8],
-                    refl: 0.0,
+                    diffuse: [0.7, 0.7, 0.7],
+                    refl: 0.3,
                     emissive: 0,
                     _dummy0: [0; 8],
                 },
+                _dummy0: [0;4], _dummy1: [0;4], _dummy2: [0;4], _dummy3: [0;4], _dummy4: [0;4],
             }
         }).collect();
 
@@ -177,7 +187,7 @@ fn main() {
             normal: [0., 1., 0.],
             d: 0.0,
             material: tracer::ty::Material {
-                diffuse: [0.8, 0.2, 0.2],
+                diffuse: [0.7, 0.7, 0.7],
                 refl: 0.0,
                 emissive: 0,
                 _dummy0: [0; 8],
@@ -235,11 +245,11 @@ fn main() {
     // TODO we should probably arc this?
     let spheres = vec![
         tracer::ty::Sphere {
-            position: [6.2, 1.0, 0.3],
-            radius: 0.9,
+            position: [0.5, 2.0, 10.0],
+            radius: 1.5,
             material: tracer::ty::Material {
-                diffuse: [0.7, 0.8, 0.1],
-                refl: 0.9,
+                diffuse: [0.7, 0.2, 0.8],
+                refl: 0.6,
                 emissive: 0,
                 _dummy0: [0; 8],
             },

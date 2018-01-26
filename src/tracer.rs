@@ -288,7 +288,6 @@ void intersect_bvh(Ray ray, inout int best_j, inout float best_t, inout int typ,
     }
 }
 
-// LOL FIX BVH
 float intersect_shadow(const Ray ray, float t) {
     for (int j = 0; j < num_spheres; j++) {
       float t_new = intersects_sphere(ray, spheres[j]);
@@ -333,8 +332,9 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t, in
 vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light_sampling, bool russian_roulette) {
     vec3 emit = vec3(0.0);
     vec3 trans = vec3(1.0);
+    bool last_specular  = true;
 
-    for (int j = 0; j < 24; j++) {
+    for (int j = 0; j < 4; j++) {
       int typ;
       int best_j;
       float t  = 1.0e34;
@@ -343,12 +343,12 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
       intersect(ray, typ, best_j, t, bvh);
 
-      /*if (debug == 1) {
+      if (debug == 1) {
         return vec3(0.0, bvh, 0.0);
-      }*/
+      }
 
       if (t >= 1.0e3) {
-        emit = vec3(1.0);
+        emit = vec3(0.0);
         break;
       }
 
@@ -369,42 +369,83 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         case 2: normal = normalize(intersection - spheres[best_j].position); break;
       }
 
-      //if (debug == 1) return (normal * vec3(0.5)) + vec3(0.5);
       if (material.emissive == 1 && dot(normal, ray.direction) <= 0.0) {
+        if (direct_light_sampling) {
+            if (last_specular) {
+                emit += trans * material.diffuse;
+            }
+            break;
+        }
         emit += trans * material.diffuse;
         break;
       }
-
+        
+      
       vec3 brdf = material.diffuse * (1.0 / PI);
 
-      float r0 = next_float_lcg(seed);
-      float cos_i;
-      float pdf;
-      if (importance_sampling) {
-        ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
-        ray.origin = intersection + ray.direction * 0.01;
-        ray.inv_direction = vec3(1.0)/ray.direction;
-        cos_i = dot(ray.direction, normal);
-        pdf = cos_i / PI;
-      } else {
-        ray.direction = local_to_world(diffuse_reflection(seed), normal);
-        ray.origin = intersection + ray.direction * 0.01;
-        ray.inv_direction = vec3(1.0)/ray.direction;
-        cos_i = dot(ray.direction, normal);
-        pdf = 1.0 / (2.0 * PI);
-      }
+      if (direct_light_sampling) {
+        vec3 pol = random_point_on_triangle(light, seed);
+        vec3 ld = pol - intersection;
+        vec3 nld = normalize(ld);
+        float dist = length(ld);
+        Ray lr;
+        lr.origin = intersection + (EPSILON * nld);
+        lr.direction = nld;
+        lr.inv_direction = 1.0 / lr.direction;
 
-      if (russian_roulette) {
-        float r0 = next_float_lcg(seed);
-        float survival = clamp(0.1, 1.0, max(max(trans.x, trans.y),trans.z));
-        if (r0 < survival) {
-          trans /= survival;
-        } else {
-          break;
+        vec3 nl = light.normal;
+
+        if (dot(normal, nld) > 0. && dot(nl, -nld) > 0. && intersect_shadow(lr, 1e8) >= dist) {
+          float area = triangle_area(light);
+          float solid_angle = (dot(nl, -nld) * area) / (dist * dist);
+          float light_pdf = 1.0 / solid_angle;
+          emit += trans * (dot(normal, nld) / light_pdf) * brdf * light.material.diffuse;
         }
-      }
 
-      trans *= (cos_i * ( 1.0 / pdf)) * brdf;
+      }
+   
+      float r0 = next_float_lcg(seed);
+      if (r0 < material.refl) {
+        last_specular = true;
+        ray.direction = reflect(ray.direction, normal);
+        ray.origin = intersection;
+        ray.origin += ray.direction * EPSILON;
+        ray.inv_direction = 1.0 / ray.direction;
+        trans *= material.diffuse;
+      } else {
+        last_specular = false;
+        float r0 = next_float_lcg(seed);
+        float cos_i;
+        float pdf;
+        if (importance_sampling) {
+          ray.direction = local_to_world(diffuse_reflection_cos(seed), normal); 
+          ray.origin = intersection + ray.direction * 0.01;
+          ray.inv_direction = vec3(1.0)/ray.direction;
+          cos_i = dot(ray.direction, normal);
+          pdf = cos_i / PI;
+        } else {
+          ray.direction = local_to_world(diffuse_reflection(seed), normal);
+          ray.origin = intersection + ray.direction * 0.01;
+          ray.inv_direction = vec3(1.0)/ray.direction;
+          cos_i = dot(ray.direction, normal);
+          pdf = 1.0 / (2.0 * PI);
+        }
+
+        if (russian_roulette) {
+          float r0 = next_float_lcg(seed);
+          float survival = clamp(0.1, 1.0, max(max(trans.x, trans.y),trans.z));
+          if (r0 < survival) {
+            trans /= survival;
+          } else {
+            break;
+          }
+        }
+        if (importance_sampling) {
+          trans *=  PI * brdf; 
+        } else {
+          trans *= (cos_i * ( 1.0 / pdf)) * brdf;
+        }
+     }
 
 
     }
@@ -440,7 +481,7 @@ void main() {
     // TODO clamp reflective services
     
     bool importance_sampling = true;
-    bool direct_light_sampling = false; gl_GlobalInvocationID.x > 255;
+    bool direct_light_sampling = true; gl_GlobalInvocationID.x > 255;
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 
