@@ -43,11 +43,11 @@ struct Node {
   uint shape_index;
 };
 
-// simple. no frensel term yet
 struct Material {
   // if emissive, then refl is the amount of light
   uint emissive;
   float refl;
+  float n;
   vec3  diffuse;
 };
 
@@ -312,10 +312,6 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t, in
     float t_new = intersects_triangle(ray, light);
     if (t_new < t) { t = t_new; best_j = -1; typ = -1; }
 
-    /*for (int j = 0; j < num_triangles; j++) {
-      float t_new = intersects_triangle(ray, triangles[j]);
-      if (t_new < t) { t = t_new; best_j = j; typ = 1; }
-    }*/
    
     intersect_bvh(ray, best_j, t, typ, bvh);
 
@@ -326,6 +322,10 @@ void intersect(const Ray ray, inout int typ, inout int best_j, inout float t, in
     }
 
 
+}
+
+float schlick(vec3 direction, vec3 normal, float r0) {
+  return r0 + (1.0 - r0) * pow((1.0 - dot(-direction, normal)), 5.);
 }
 
 
@@ -383,7 +383,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
       
       vec3 brdf = material.diffuse * (1.0 / PI);
 
-      if (direct_light_sampling) {
+      if (direct_light_sampling && material.n < 1.) {
         vec3 pol = random_point_on_triangle(light, seed);
         vec3 ld = pol - intersection;
         vec3 nld = normalize(ld);
@@ -403,9 +403,37 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
         }
 
       }
-   
+
+      bool outside = dot(ray.direction, normal) < 0.;
+      // Dielectric
       float r0 = next_float_lcg(seed);
-      if (r0 < material.refl) {
+      if (material.n >= 1.) {
+        last_specular = true;
+        float n1, n2, ndotr = dot(ray.direction,normal);
+        if( ndotr > 0. ) {
+            n1 = 1.0; 
+            n2 = material.n;
+            normal = -normal;
+        } else {
+            n1 = material.n;
+            n2 = 1.0; 
+        }
+                
+        float r0 = (n1-n2)/(n1+n2); r0 *= r0;
+		float fresnel = r0 + (1.-r0) * pow(1.0-abs(ndotr),5.);
+        
+        
+        if( next_float_lcg(seed) < fresnel ) {
+            ray.direction = reflect( ray.direction, normal );
+        } else {
+            ray.direction = refract( ray.direction, normal, n2/n1 );
+        }
+        ray.origin = intersection + (ray.direction * EPSILON);
+        ray.inv_direction = (1.0 / ray.direction);
+        // TODO beer
+        trans *= material.diffuse;
+        
+      } else if (r0 < material.refl) {
         last_specular = true;
         ray.direction = reflect(ray.direction, normal);
         ray.origin = intersection;
@@ -446,8 +474,6 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
           trans *= (cos_i * ( 1.0 / pdf)) * brdf;
         }
      }
-
-
     }
 
     return emit;
@@ -455,8 +481,6 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
 
 
 void main() {
-
-    //imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(0.0), 1.0)); 
     uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * imageSize(img).x;
 
     if (frame_num == 1) {
