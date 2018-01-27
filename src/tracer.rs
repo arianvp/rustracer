@@ -334,7 +334,7 @@ vec3 trace(Ray ray, inout uint seed, bool importance_sampling, bool direct_light
     vec3 trans = vec3(1.0);
     bool last_specular  = true;
     float absorb_distance = 0.0;
-    for (int j = 0; j < 4; j++) {
+    for (int j = 0; j < 512; j++) {
       int typ;
       int best_j;
       float t  = 1.0e34;
@@ -519,15 +519,15 @@ void main() {
     // TODO clamp reflective services
     
     bool importance_sampling = true;
-    bool direct_light_sampling = true; gl_GlobalInvocationID.x > 255;
+    bool direct_light_sampling = false; gl_GlobalInvocationID.x > 255;
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
 
-    float l = length(color);
+    /*float l = length(color);
     if (l > 5.0) {
         color /= l;
         color *= 5.0;
-    }
+    }*/
     accum[idx] +=  color;
     vec3 outCol = accum[idx] / float(frame_num);
     imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(outCol, 1.0));
