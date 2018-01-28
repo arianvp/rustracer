@@ -1,32 +1,43 @@
 #version 450
 
 struct Ray {
-  vec3 origin;
-  vec3 direction;
-  vec3 inv_direction;
+  vec3 origin, direction, inv_direction, throughput;
   float t;
-  uint primitive_idx;
-  vec3 throughput;
+  uint triangle_index;
   uvec2 screen_pos;
 };
 
+struct Material {
+  int emissive;
+  vec3 diffuse, n;
+  float refl;
+};
+
+struct Triangle {
+  vec3 p1, p2, p3, normal;
+  Material material;
+};
+
 struct AABB {
-  vec3 min;
-  vec3 max;
+  vec3 min, max;
 };
 
 struct Node {
   AABB aabb;
-  uint entry_index;
-  uint exit_index;
-  uint shape_index;
+  uint entry_index, exit_index, shape_index;
 };
 
 layout(local_size_x = 16, local_size_y = 16) in;
-layou0(set = 0, binding = 0) buffer Rays { Ray rays[]; };
-layout(set = 0, binding = 1) buffer RayIndex { uint ray_index; };
 
-// will set `t` and `primitive_index`
+layout(std430, set = 0, binding = 0) buffer Rays { Ray rays[]; };
+layout(std430, set = 0, binding = 1) buffer RayIndex { uint ray_index; };
+
+
+layout(std430, set = 1, binding = 0) buffer Nodes { Node nodes[]; };
+layout(std430, set = 1, binding = 1) buffer Triangles { Triangle triangles[]; };
+
+
+// will set `t` and `triangle_index`
 void intersect(uint idx) {
   // intersect the BVH
 }
@@ -39,9 +50,25 @@ void intersect(uint idx) {
 // then we compact
 // 13589
 // now `ray_index` = 5  which we will use as size input in next step
+// shared uint local_ray_index;
 void main() {
   uint idx = gl_GlobalInvocationID.x;
   intersect(idx);
-  if (rays[idx].t >= 1e34) return;
+  if(rays[idx].t >= 1e34) return;
   rays[atomicAdd(ray_index, 1)] = rays[idx];
+  // Dunno if below is correct. but is probably faster
+  /*
+  local_ray_index = (gl_WorkGroupID * gl_WorkGroupSize).x;
+  memoryBarrierShared(); // ensure change is visible to others;
+  barrier(); // stall until all have set to 0
+
+  uint idx = gl_GlobalInvocationID.x;
+  intersect(idx);
+  if (rays[idx].t >= 1e34) return;
+  rays[atomicAdd(local_ray_index, 1)] = rays[idx];
+
+  // wait for all threads in a warp to finish
+  memoryBarrierShared();
+  barrier();
+  atomicAdd(ray_index, local_ray_index);*/
 }

@@ -1,36 +1,27 @@
 #version 450
 
 struct Camera {
-  vec3 origin;
-  vec3 target;
-  vec3 direction;
-  vec3 p1;
-  vec3 p2;
-  vec3 p3;
-  vec3 right;
-  vec3 up;
+  vec3 origin, target, direction, p1, p2, p3, right, up;
   float focal_distance;
 };
 
 struct Ray {
-  vec3 origin;
-  vec3 direction;
-  vec3 inv_direction;
+  vec3 origin, direction, inv_direction, throughput;
   float t;
-  vec3 throughput;
+  uint triangle_index;
   uvec2 screen_pos;
 };
 
 layout(local_size_x = 16, local_size_y = 16) in;
-layout(set = 0, binding = 0) buffer writeonly Rays { Ray rays[]; };
-layout(std140, set = 0, binding = 1) uniform readonly Input { Camera camera; uint width; uint height;};
+layout(std430, set = 0, binding = 0) buffer writeonly Rays { Ray rays[]; };
+layout(std140, set = 1, binding = 0) uniform readonly Input { Camera camera; vec2 screen_size };
 
 
 void main() {
-  uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * width;
-  vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(float(width), float(height));
+  uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * screen_size.x;
+  vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(screen_size);
   vec3 target = camera.p1 + uv.x * (camera.p2 - camera.p1) + uv.y * (camera.p3 - camera.p1);
   vec3 origin = camera.origin;
   vec3 direction = normalize(target - origin);
-  rays[idx] = Ray( origin, direction, vec3(1.) / direction, 1e34, vec3(1.), gl_GlobalInvocationID.xy);
+  rays[idx] = Ray( origin, direction, vec3(1.) / direction, vec3(1.), 1e34, 0, gl_GlobalInvocationID.xy);
 }
