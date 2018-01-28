@@ -12,7 +12,6 @@ extern crate winit;
 extern crate image;
 extern crate nalgebra;
 extern crate scoped_threadpool;
-extern crate obj;
 
 extern crate half;
 extern crate tobj;
@@ -21,24 +20,19 @@ mod tracer;
 mod types;
 mod graphics;
 mod compute;
-mod scene;
+
 use fps_counter::FPSCounter;
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::path::Path;
-use vulkano::buffer::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::device::{Device, DeviceExtensions, Queue};
 use vulkano::instance::{Instance, PhysicalDevice};
 use vulkano::sync::{GpuFuture, now};
 use vulkano_win::{VkSurfaceBuild, Window};
 use winit::{Event, EventsLoop, WindowBuilder, WindowEvent};
-use std::fs::File;
-use std::io::BufReader;
-use obj::Obj;
 use bvh::bvh::BVH;
-use bvh::flat_bvh::*;
 
 
 fn init_window(instance: Arc<Instance>) -> (EventsLoop, Window) {
@@ -124,11 +118,7 @@ fn main() {
             _dummy4: [0;4],
         };
 
-   // let file_input =
-    //    BufReader::new(File::open(obj_file).expect("Failed to open .obj file."));
-    //let obj: Obj<tracer::ty::Triangle> = obj::load_obj(file_input).expect("Failed to decode .obj file data.");
-   
-    let (models, materials) = tobj::load_obj(&Path::new(&obj_file)).unwrap();
+    let (models, _materials) = tobj::load_obj(&Path::new(&obj_file)).unwrap();
     let mesh = &models[0].mesh;
 
     let positions: Vec<[f32;3]> = mesh.positions
@@ -156,8 +146,8 @@ fn main() {
                     let p2 = Vector3::from(p2);
                     let p3 = Vector3::from(p3);
 
-                    let e1 = (p2 - p1);
-                    let e2 = (p3 - p1);
+                    let e1 = p2 - p1;
+                    let e2 = p3 - p1;
 
                     let res = e1.cross(&e2).normalize();
                     [res.x, res.y, res.z]

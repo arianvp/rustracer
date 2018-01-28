@@ -1,16 +1,11 @@
 use nalgebra::{Vector3, Point3};
-use std::fmt::Debug;
 use winit::VirtualKeyCode;
 use std::collections::HashSet;
-
-
 use bvh::aabb::{AABB, Bounded};
 use bvh::ray::Intersection;
 use bvh::ray::Ray;
 use bvh::flat_bvh;
 use bvh::bounding_hierarchy::BHShape;
-use obj::*;
-use obj::raw::object::Polygon;
 
 #[derive(VulkanoShader)]
 #[ty = "compute"]
@@ -47,13 +42,13 @@ impl Bounded for ty::Triangle {
 }
 
 impl BHShape for ty::Triangle {
-    fn set_bh_node_index(&mut self, index: usize) {}
+    fn set_bh_node_index(&mut self, _index: usize) {}
 
     fn bh_node_index(&self) -> usize {
         0
     }
 
-    fn intersect(&self, ray: &Ray) -> Intersection {
+    fn intersect(&self, _ray: &Ray) -> Intersection {
         Intersection {
             distance: 0.0,
             u: 0.0,
@@ -61,64 +56,6 @@ impl BHShape for ty::Triangle {
         }
     }
 }
-
-/* 
-impl FromRawVertex for ty::Triangle {
-    fn process(vertices: Vec<(f32, f32, f32, f32)>,
-               _: Vec<(f32, f32, f32)>,
-               polygons: Vec<Polygon>)
-               -> ObjResult<(Vec<Self>, Vec<u16>)> {
-        // Convert the vertices to `Point3`s.
-        let points = vertices
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        // Estimate for the number of triangles, assuming that each polygon is a triangle.
-        let mut triangles = Vec::with_capacity(polygons.len());
-        {
-            let mut push_triangle = |indices: &Vec<usize>| {
-                let mut indices_iter = indices.iter();
-                let anchor = points[*indices_iter.next().unwrap()];
-                let mut second = points[*indices_iter.next().unwrap()];
-                for third_index in indices_iter {
-                    let third = points[*third_index];
-
-                    triangles.push(ty::Triangle{
-                        p1: [anchor.0, anchor.1, anchor.2],
-                        p2: [second.0, second.1, second.2],
-                        p3: [ third.0,  third.1,  third.2],
-                        material: ty::Material{
-                            diffuse: [0.7, 0.2, 0.7],
-                            emissive: 0,
-                            refl: 0.0,
-                            _dummy0: [0;8],
-                        },
-                        _dummy0: [0;4],
-                        _dummy1: [0;4],
-                        _dummy2: [0;4],
-                        _dummy3: [0;4],
-                    });
-                    second = third;
-                }
-            };
-
-            // Iterate over the polygons and populate the `Triangle`s vector.
-            for polygon in polygons.into_iter() {
-                match polygon {
-                    Polygon::P(ref vec) => push_triangle(vec),
-                    Polygon::PT(ref vec) |
-                    Polygon::PN(ref vec) => {
-                        push_triangle(&vec.iter().map(|vertex| vertex.0).collect())
-                    }
-                    Polygon::PTN(ref vec) => {
-                        push_triangle(&vec.iter().map(|vertex| vertex.0).collect())
-                    }
-                }
-            }
-        }
-        Ok((triangles, Vec::new()))
-    }
-}*/
 
 impl ty::Camera {
     pub fn new(origin: Vector3<f32>, target: Vector3<f32>, focal_distance: f32) -> ty::Camera {

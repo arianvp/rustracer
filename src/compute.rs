@@ -1,8 +1,7 @@
 
 use tracer;
-use std::iter;
 use std::sync::Arc;
-use vulkano::buffer::{BufferAccess, BufferUsage, CpuBufferPool, CpuAccessibleBuffer, DeviceLocalBuffer};
+use vulkano::buffer::{BufferUsage, CpuBufferPool, CpuAccessibleBuffer};
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::descriptor::descriptor_set::DescriptorSet;
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
@@ -24,7 +23,7 @@ pub struct ComputePart<I: 'static + ImageViewAccess + Send + Sync> {
 }
 
 impl<I: 'static + ImageViewAccess + Send + Sync> ComputePart<I> {
-    pub fn new(device: &Arc<Device>, image: Arc<I>, spheres: Vec<tracer::ty::Sphere>, planes: Vec<tracer::ty::Plane>, triangles: Vec<tracer::ty::Triangle>, nodes: Vec<tracer::ty::Node>, family: QueueFamily) -> ComputePart<I> {
+    pub fn new(device: &Arc<Device>, image: Arc<I>, spheres: Vec<tracer::ty::Sphere>, planes: Vec<tracer::ty::Plane>, triangles: Vec<tracer::ty::Triangle>, nodes: Vec<tracer::ty::Node>, _family: QueueFamily) -> ComputePart<I> {
         let shader = tracer::Shader::load(device.clone()).expect("failed to create shader module");
         let pipeline = Arc::new(
             ComputePipeline::new(device.clone(), &shader.main_entry_point(), &())
