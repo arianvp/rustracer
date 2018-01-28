@@ -20,7 +20,7 @@ struct Dummy;
 
 fn aabb_to_aabb(aabb: AABB) -> ty::AABB {
     ty::AABB {
-        _dummy0: [0;4],
+        _dummy0: [0; 4],
         min: [aabb.min.x, aabb.min.y, aabb.min.z],
         max: [aabb.max.x, aabb.max.y, aabb.max.z],
     }
@@ -28,8 +28,8 @@ fn aabb_to_aabb(aabb: AABB) -> ty::AABB {
 
 pub fn node_to_node(node: flat_bvh::FlatNode) -> ty::Node {
     ty::Node {
-        _dummy0: [0;4],
-        _dummy1: [0;4],
+        _dummy0: [0; 4],
+        _dummy1: [0; 4],
         aabb: aabb_to_aabb(node.aabb),
         entry_index: node.entry_index,
         exit_index: node.exit_index,
@@ -47,20 +47,17 @@ impl Bounded for ty::Triangle {
 }
 
 impl BHShape for ty::Triangle {
-    fn set_bh_node_index(&mut self, index: usize) {
-        // do nothing, just here for dummy
-    }
+    fn set_bh_node_index(&mut self, index: usize) {}
 
     fn bh_node_index(&self) -> usize {
-        // nothing. just here for dummy
         0
     }
 
     fn intersect(&self, ray: &Ray) -> Intersection {
         Intersection {
-          distance: 0.0,
-          u: 0.0,
-          v: 0.0,
+            distance: 0.0,
+            u: 0.0,
+            v: 0.0,
         }
     }
 }
@@ -125,7 +122,17 @@ impl FromRawVertex for ty::Triangle {
 
 impl ty::Camera {
     pub fn new(origin: Vector3<f32>, target: Vector3<f32>, focal_distance: f32) -> ty::Camera {
-        let mut camera = ty::Camera::_new(origin.into(), target.into(), [0.;3], [0.;3], [0.;3], [0.;3],[0.;3],[0.;3], focal_distance);
+        let mut camera = ty::Camera::_new(
+            origin.into(),
+            target.into(),
+            [0.; 3],
+            [0.; 3],
+            [0.; 3],
+            [0.; 3],
+            [0.; 3],
+            [0.; 3],
+            focal_distance,
+        );
         camera.update();
         camera
     }
@@ -140,8 +147,16 @@ impl ty::Camera {
         up: [f32; 3],
         focal_distance: f32,
     ) -> ty::Camera {
-        ty::Camera { 
-            origin, target, direction, p1, p2, p3, right, up, focal_distance,
+        ty::Camera {
+            origin,
+            target,
+            direction,
+            p1,
+            p2,
+            p3,
+            right,
+            up,
+            focal_distance,
             _dummy0: [0; 4],
             _dummy1: [0; 4],
             _dummy2: [0; 4],
@@ -149,7 +164,7 @@ impl ty::Camera {
             _dummy4: [0; 4],
             _dummy5: [0; 4],
             _dummy6: [0; 4],
-        } 
+        }
     }
 
     pub fn update(&mut self) {
@@ -168,59 +183,80 @@ impl ty::Camera {
 
         let c = origin + self.focal_distance * direction;
 
-        self.p1 = (c + (-0.5 * self.focal_distance * right) + (0.5 * self.focal_distance * up)).into();
-        self.p2 = (c + (0.5 * self.focal_distance * right) + (0.5 * self.focal_distance * up)).into();
-        self.p3 = (c + (-0.5 * self.focal_distance * right) + (-0.5 * self.focal_distance * up)).into();
+        self.p1 = (c + (-0.5 * self.focal_distance * right) + (0.5 * self.focal_distance * up))
+            .into();
+        self.p2 = (c + (0.5 * self.focal_distance * right) + (0.5 * self.focal_distance * up))
+            .into();
+        self.p3 = (c + (-0.5 * self.focal_distance * right) + (-0.5 * self.focal_distance * up))
+            .into();
     }
 
-   pub fn handle_input(&mut self, keycodes: &HashSet<VirtualKeyCode>) {
-       for keycode in keycodes {
+    pub fn handle_input(&mut self, keycodes: &HashSet<VirtualKeyCode>) {
+        for keycode in keycodes {
             match *keycode {
                 VirtualKeyCode::W => {
-                    self.origin = (Vector3::from(self.origin) + 0.1 * Vector3::from(self.direction)).into();
-                },
+                    self.origin = (Vector3::from(self.origin) +
+                        0.1 * Vector3::from(self.direction)).into();
+                }
                 VirtualKeyCode::A => {
-                    self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.right))).into();
-                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right))).into();
-                },
+                    self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.right)))
+                        .into();
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right)))
+                        .into();
+                }
                 VirtualKeyCode::S => {
-                    self.origin = (Vector3::from(self.origin) + -0.1 * Vector3::from(self.direction)).into();
-                },
+                    self.origin = (Vector3::from(self.origin) +
+                                       -0.1 * Vector3::from(self.direction)).into();
+                }
                 VirtualKeyCode::D => {
-                    self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.right))).into();
-                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right))).into();
-                },
+                    self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.right)))
+                        .into();
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right)))
+                        .into();
+                }
                 VirtualKeyCode::E => {
-                    self.origin = (Vector3::from(self.origin) + 10.0 * Vector3::from(self.direction)).into();
-                    self.target = (Vector3::from(self.target) + 10.0 * Vector3::from(self.direction)).into();
-                },
+                    self.origin = (Vector3::from(self.origin) +
+                                       10.0 * Vector3::from(self.direction)).into();
+                    self.target = (Vector3::from(self.target) +
+                                       10.0 * Vector3::from(self.direction)).into();
+                }
                 VirtualKeyCode::Q => {
-                    self.origin = (Vector3::from(self.origin) + -10.0 * Vector3::from(self.direction)).into();
-                    self.target = (Vector3::from(self.target) + -10.0 * Vector3::from(self.direction)).into();
-                },
+                    self.origin = (Vector3::from(self.origin) +
+                                       -10.0 * Vector3::from(self.direction)).into();
+                    self.target = (Vector3::from(self.target) +
+                                       -10.0 * Vector3::from(self.direction)).into();
+                }
                 VirtualKeyCode::R => {
-                    self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.up))).into();
-                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up))).into();
-                },
+                    self.origin = (Vector3::from(self.origin) + (0.1 * Vector3::from(self.up)))
+                        .into();
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up)))
+                        .into();
+                }
                 VirtualKeyCode::F => {
-                    self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.up))).into();
-                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up))).into();
-                },
+                    self.origin = (Vector3::from(self.origin) + (-0.1 * Vector3::from(self.up)))
+                        .into();
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up)))
+                        .into();
+                }
                 VirtualKeyCode::Up => {
-                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up))).into();
-                },
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.up)))
+                        .into();
+                }
                 VirtualKeyCode::Down => {
-                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up))).into();
-                },
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.up)))
+                        .into();
+                }
                 VirtualKeyCode::Left => {
-                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right))).into();
-                },
+                    self.target = (Vector3::from(self.target) + (-0.1 * Vector3::from(self.right)))
+                        .into();
+                }
                 VirtualKeyCode::Right => {
-                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right))).into();
-                },
-                _ => {},
+                    self.target = (Vector3::from(self.target) + (0.1 * Vector3::from(self.right)))
+                        .into();
+                }
+                _ => {}
             }
-       }
+        }
         self.update();
     }
 }
@@ -232,3 +268,4 @@ impl ty::Camera {
 // connect   (will only trace shadow rays)     (is the only one that plot to the screen. Only shadow rays contribute)  (though not true for mirrors)
 // jump back to to extend
 // compaction can be done with atomic counter
+
