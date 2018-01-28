@@ -1,0 +1,47 @@
+#version 450
+
+struct Ray {
+  vec3 origin;
+  vec3 direction;
+  vec3 inv_direction;
+  float t;
+  uint primitive_idx;
+  vec3 throughput;
+  uvec2 screen_pos;
+};
+
+struct AABB {
+  vec3 min;
+  vec3 max;
+};
+
+struct Node {
+  AABB aabb;
+  uint entry_index;
+  uint exit_index;
+  uint shape_index;
+};
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layou0(set = 0, binding = 0) buffer Rays { Ray rays[]; };
+layout(set = 0, binding = 1) buffer RayIndex { uint ray_index; };
+
+// will set `t` and `primitive_index`
+void intersect(uint idx) {
+  // intersect the BVH
+}
+
+
+// Say we have  Rays
+// 123456789
+// we find which ones intersect
+// 1x3x5xx89
+// then we compact
+// 13589
+// now `ray_index` = 5  which we will use as size input in next step
+void main() {
+  uint idx = gl_GlobalInvocationID.x;
+  intersect(idx);
+  if (rays[idx].t >= 1e34) return;
+  rays[atomicAdd(ray_index, 1)] = rays[idx];
+}
