@@ -278,7 +278,7 @@ fn create_swapchain(
 pub mod vs {
     #[derive(VulkanoShader)]
     #[ty = "vertex"]
-    #[path = "shaders/quad.vert.glsl"]
+    #[path = "shaders/quad.glsl.vert"]
     #[allow(dead_code)]
     struct Dummy;
 }
@@ -286,7 +286,7 @@ pub mod vs {
 pub mod fs {
     #[derive(VulkanoShader)]
     #[ty = "fragment"]
-    #[path = "shaders/quad.frag.glsl"]
+    #[path = "shaders/quad.glsl.frag"]
     #[allow(dead_code)]
     struct Dummy;
 }

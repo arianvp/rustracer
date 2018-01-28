@@ -11,6 +11,7 @@ use vulkano::instance::QueueFamily;
 use vulkano::pipeline::ComputePipeline;
 use vulkano::pipeline::ComputePipelineAbstract;
 
+
 pub struct ComputePart<I: 'static + ImageViewAccess + Send + Sync> {
     pipeline: Arc<ComputePipelineAbstract + Send + Sync>,
     image: Arc<I>,

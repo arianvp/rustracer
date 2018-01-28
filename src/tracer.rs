@@ -9,7 +9,7 @@ use bvh::bounding_hierarchy::BHShape;
 
 #[derive(VulkanoShader)]
 #[ty = "compute"]
-#[path = "shaders/tracer.comp.glsl"]
+#[path = "shaders/tracer.glsl.comp"]
 #[allow(dead_code)]
 struct Dummy;
 

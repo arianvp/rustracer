@@ -506,20 +506,22 @@ void main() {
 
     Ray ray = generate_ray(uv);
   
-    // TODO make these constants?
-    //
-    // TODO clamp reflective services
     
     bool importance_sampling = true;
-    bool direct_light_sampling = false; gl_GlobalInvocationID.x > 255;
+    bool direct_light_sampling = true; gl_GlobalInvocationID.x > 255;
     bool russian_roulette = true;
     vec3 color = trace(ray, seed, importance_sampling, direct_light_sampling, russian_roulette);
+    bool clamping = true;
 
-    /*float l = length(color);
-    if (l > 5.0) {
-        color /= l;
-        color *= 5.0;
-    }*/
+
+    if (direct_light_sampling && clamping) {
+      // We clamp colors to reduce fireflies. Do note that this introduces BIAS
+      float l = length(color);
+      if (l > 5.0) {
+          color /= l;
+          color *= 5.0;
+      }
+    }
     accum[idx] +=  color;
     vec3 outCol = accum[idx] / float(frame_num);
     imageStore(img, ivec2(gl_GlobalInvocationID.xy), vec4(outCol, 1.0));

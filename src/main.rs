@@ -9,11 +9,8 @@ extern crate vulkano_shader_derive;
 extern crate vulkano;
 extern crate vulkano_win;
 extern crate winit;
-extern crate image;
 extern crate nalgebra;
-extern crate scoped_threadpool;
 
-extern crate half;
 extern crate tobj;
 
 mod tracer;

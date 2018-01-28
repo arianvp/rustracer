@@ -1,0 +1,38 @@
+#version 450
+struct Camera {
+  vec3 origin;
+  vec3 target;
+  vec3 direction;
+  vec3 p1;
+  vec3 p2;
+  vec3 p3;
+  vec3 right;
+  vec3 up;
+  float focal_distance;
+};
+
+struct Ray {
+  vec3 origin;
+  vec3 direction;
+  vec3 inv_direction;
+  float t;
+};
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0) buffer writeonly Rays { Ray rays[] };
+layout(std140, set = 0, binding = 2) uniform number_of_rays;
+layout(std140, set = 0, binding = 1) uniform readonly Camera camera;
+
+
+Ray generate_ray(vec2 uv) {
+  vec3 t = camera.p1 + uv.x * (camera.p2 - camera.p1) + uv.y * (camera.p3 - camera.p1);
+  vec3 origin = camera.origin;
+  vec3 direction = normalize(t - origin);
+  return {origin, direction, vec3(1.0)/direction, 1e34};
+}
+
+void main() {
+  uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * imageSize(img).x;
+  vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(img);
+  rays[idx] = generate_ray(uv);
+}
