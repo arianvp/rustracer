@@ -14,14 +14,44 @@ struct Ray {
 
 layout(local_size_x = 16, local_size_y = 16) in;
 layout(std430, set = 0, binding = 0) buffer writeonly Rays { Ray rays[]; };
-layout(std140, set = 1, binding = 0) uniform readonly Input { Camera camera; vec2 screen_size };
+layout(std430, set = 0, binding = 1) readonly buffer RayIndex { uint ray_index; };
+layout(std430, set = 0, binding = 2) buffer CurrentPos  { uvec2 current_pos; };
+layout(std140, set = 1, binding = 0) uniform readonly Input { 
+  Camera camera;
+};
 
 
+/* The ask of this shader is to fill up  `rays` from `ray_index` onwards with
+ * new primary rays originating from `camera`.
+ *
+ * What is important is that the previous iteration might not have rendered
+ * the entire screen. We should thus be careful that we assign each ray
+ * the correct screen coordinate.  `current_pos` carries current screen coordinate.
+ * (Where we left off in the previous iteration)
+ *
+ * Also, we should take into account that there are only 0x200 * 0x200 rays
+ */
 void main() {
-  uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * screen_size.x;
-  vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(screen_size);
+  // the next screen coordinate is the current position + the work offset, modulo the screen size
+  uint space_left = (0x200 * 0x200) - ray_index;
+
+  // Get our coordinate given some offset. with a nice wraparound
+  uvec2 xy = (gl_GlobalInvocationID.xy + current_pos) % uvec2(0x200);
+  vec2 uv = vec2(xy) / vec2(0x200);
+  uint idx = xy.x + xy.y * 0x200;
+
+  // We've filled the entire ray array already
+  if (ray_index + idx >= 0x200 * 0x200) return;
+
+
+  Ray ray;
   vec3 target = camera.p1 + uv.x * (camera.p2 - camera.p1) + uv.y * (camera.p3 - camera.p1);
-  vec3 origin = camera.origin;
-  vec3 direction = normalize(target - origin);
-  rays[idx] = Ray( origin, direction, vec3(1.) / direction, vec3(1.), 1e34, 0, gl_GlobalInvocationID.xy);
+  ray.origin = camera.origin;
+  ray.direction = normalize(target - ray.origin);
+  ray.inv_direction = 1. / ray.direction;
+  ray.throughput = vec3(1.);
+  ray.t = 1e34;
+  ray.triangle_index = 0;
+  ray.screen_pos = xy;
+  rays[ray_index + idx] = ray;
 }

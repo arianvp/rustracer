@@ -1,5 +1,6 @@
 #version 450
 
+
 struct Ray {
   vec3 origin, direction, inv_direction, throughput;
   float t;
